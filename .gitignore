@@ -1,6 +1,7 @@
 /node_modules
 /artifacts
 /contract/artifacts
+/contract/just_test/artifacts
 /bin
 /package-lock.json
 /package.json
