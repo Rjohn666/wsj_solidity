@@ -2,3 +2,5 @@
 /artifacts
 /contract/artifacts
 /bin
+/package-lock.json
+/package.json
