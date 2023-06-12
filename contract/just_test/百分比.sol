@@ -4,35 +4,30 @@ pragma solidity ^0.8.9;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 contract MyToken is ERC20, ERC20Burnable, Ownable {
+    using SafeMath for uint256;
+
+    // mint
     uint256 maxSupply = 3456000000 * 10 ** 18;
-    mapping(address => uint8) public minted;
+    // mapping(address => uint8) public  minted;
     uint256 private last_mint_time;
     uint256 public mint_amount = 100000 * 10 ** 18;
     uint public Interval_time = 10;
-    uint public mint_price = 0.003456 * 10 ** 18;
+    uint public mint_price = 0.0023456 * 10 ** 18;
     bool public is_active = true;
+
+    // pool
+    uint256 private MINT_THRESHOLD = 10;
+    uint256 private mintCount;
+    uint256 private prizePool;
+    mapping(uint256 => address) private mintParticipants;
 
     constructor() ERC20("ImmuneCell", "IC") {}
 
     receive() external payable {
         payable(owner()).transfer(msg.value);
-    }
-
-    function mint() public payable {
-        uint256 ts = block.timestamp;
-        require(is_active, "n");
-        // require(minted[msg.sender]<mint_times,"Mint limited");
-        require(msg.value >= mint_price, "IB");
-        require(totalSupply() + mint_amount <= maxSupply);
-        require(ts - last_mint_time > Interval_time, "Unarrived time interval");
-        _mint(msg.sender, mint_amount);
-        if (msg.value >= 0) {
-            payable(owner()).transfer(msg.value);
-        }
-        last_mint_time = ts;
-        minted[msg.sender] += 1;
     }
 
     function check_mint_amount() private {
@@ -62,5 +57,22 @@ contract MyToken is ERC20, ERC20Burnable, Ownable {
         } else {
             is_active = true;
         }
+    }
+
+    function get_random_int(uint8 limit) public view returns (uint8) {
+        bytes32 callHash = keccak256(
+            abi.encodePacked(msg.sig, block.number, block.timestamp, msg.sender)
+        );
+        uint256 hashAsInteger = uint256(callHash);
+        return uint8(hashAsInteger) % limit;
+    }
+
+    function calculatePercentage(
+        uint256 percentage
+    ) external payable returns (uint256) {
+        require(percentage <= 100, "Invalid percentage"); // 确保百分比不超过100
+
+        uint256 percentageAmount = msg.value.mul(percentage).div(100);
+        return percentageAmount;
     }
 }
