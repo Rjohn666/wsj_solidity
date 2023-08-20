@@ -1,0 +1,150 @@
+{
+	"compiler": {
+		"version": "0.8.19+commit.7dd6d404"
+	},
+	"language": "Solidity",
+	"output": {
+		"abi": [
+			{
+				"inputs": [],
+				"stateMutability": "nonpayable",
+				"type": "constructor"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "start_index",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "end_index",
+						"type": "uint256"
+					}
+				],
+				"name": "BatchBoost",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "invite_code",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "times",
+						"type": "uint256"
+					}
+				],
+				"name": "BatchMint",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "start_index",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "end_index",
+						"type": "uint256"
+					}
+				],
+				"name": "BatchWithdarw",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "code",
+						"type": "uint256"
+					}
+				],
+				"name": "change_code",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "times",
+						"type": "uint256"
+					}
+				],
+				"name": "change_times",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_owner",
+						"type": "address"
+					}
+				],
+				"name": "own_address_num",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "res",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			}
+		],
+		"devdoc": {
+			"kind": "dev",
+			"methods": {},
+			"version": 1
+		},
+		"userdoc": {
+			"kind": "user",
+			"methods": {},
+			"version": 1
+		}
+	},
+	"settings": {
+		"compilationTarget": {
+			"contract/dragon/dragon.sol": "Batcher"
+		},
+		"evmVersion": "paris",
+		"libraries": {},
+		"metadata": {
+			"bytecodeHash": "ipfs"
+		},
+		"optimizer": {
+			"enabled": false,
+			"runs": 200
+		},
+		"remappings": []
+	},
+	"sources": {
+		"contract/dragon/dragon.sol": {
+			"keccak256": "0x5f3b672f47a25d57a70700faff344044cfea4d48abd731861bda8a14fbe312b4",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://bed2481ff1cb82344bf5c96c7b9f173857beb973d56f3ccedf8a3c05843cce5f",
+				"dweb:/ipfs/QmZG6cuGwLaojZzYB6Qoo2UpsN8oJayXv5BpjaV3XQ6Jf1"
+			]
+		}
+	},
+	"version": 1
+}
