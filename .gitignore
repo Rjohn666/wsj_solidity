@@ -1,5 +1,5 @@
 /node_modules
-/artifacts
+artifacts
 /contract/artifacts
 /contract/just_test/artifacts
 /bin
