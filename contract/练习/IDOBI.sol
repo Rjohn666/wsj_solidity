@@ -85,6 +85,9 @@ interface ISwapFactory {
     ) external returns (address pair);
 }
 
+interface ISwapPair {
+    function sync() external;
+}
 
 abstract contract Ownable {
     address private _owner;
@@ -132,9 +135,9 @@ abstract contract Ownable {
 //这个合约用于暂存USDT，用于回流和营销钱包，分红
 contract TokenDistributor {
     //构造参数传USDT合约地址
-    constructor(address token) {
+    constructor(address tokenA) {
         //将暂存合约的USDT授权给合约创建者，这里的创建者是代币合约，授权数量为最大整数
-        IERC20(token).approve(msg.sender, uint(~uint256(0)));
+        IERC20(tokenA).approve(msg.sender, uint(~uint256(0)));
     }
 }
 
@@ -146,23 +149,187 @@ abstract contract AbsToken is IERC20, Ownable {
     string private _name; //名称
     string private _symbol; //符号
     uint8 private _decimals; //精度
-
     uint256 private constant MAX = ~uint256(0);
     uint256 private _tTotal; //总量
     address DEAD = 0x000000000000000000000000000000000000dEaD;
+    // 团队地址
+    address private team_address;
+    address private fund_address;
 
+    //ido参数
+    bool ido_opening;
+    uint256 private numforpresale = 200 * 10 ** 18;
+    uint256 private priceforpresale = 200 * 10 ** 6;
+    address private USDC = address(0x07865c6E87B9F70255377e024ace6630C1Eaa37F);
+    mapping (address=>bool) private bought;
+
+    uint256 startTradeBlock;
+    // 交易所需参数
+    mapping(address => bool) private _feeWhiteList;
+    ISwapRouter public _router;
+    TokenDistributor public token_distributor;
+    address private mainPair;
+    bool in_swap;
+    modifier lock_swap() {
+        in_swap = true;
+        _;
+        in_swap = false;
+    }
+    uint256 private NumSelltoFund;
+    
     constructor(string memory Name,
         string memory Symbol,
         uint8 Decimals,
-        uint256 Supply) {
+        uint256 Supply
+        ) 
+        {
         _name = Name;
         _symbol = Symbol;
         _decimals = Decimals;
+        team_address = msg.sender;
+        fund_address = address(0x3C50d3a325aA9968Ae66b4ED2354D3570f1D9309);
         //总量
         _tTotal = Supply * 10 ** _decimals;
-        //初始代币转给营销钱包
-        _balances[tx.origin] = _tTotal;
-        emit Transfer(address(0), tx.origin, _tTotal);
+        //初始代币团队预留50%
+        // 新建合约收u
+        token_distributor = new TokenDistributor(USDC);
+        _balances[team_address] = _tTotal * 50 /100;
+        _balances[address(token_distributor)] = _tTotal* 50 /100;
+        emit Transfer(address(0), team_address, _tTotal * 50 /100);
+        emit Transfer(address(0), address(token_distributor), _tTotal * 50 /100);
+
+        // 创建池子
+        _router = ISwapRouter(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+        mainPair = ISwapFactory(_router.factory()).createPair(address(this),USDC);
+
+        // 授权代币给路由合约
+        _allowances[address(this)][address(_router)] = MAX;
+        IERC20(USDC).approve(address(_router), MAX);
+        _allowances[msg.sender][address(_router)] = MAX;
+
+        // 授权白名单
+        _feeWhiteList[msg.sender] = true;
+        _feeWhiteList[address(_router)] = true;
+        _feeWhiteList[address(this)] = true;
+        _feeWhiteList[address(token_distributor)] = true;
+
+    
+        NumSelltoFund = _tTotal / 10000;
+    }
+
+    function buy() public {
+        require(ido_opening,"Not Open");
+        require(!bought[msg.sender],"Already bought");
+        require(balanceOf(address(token_distributor))>=numforpresale,"Insufficient quantity");
+        IERC20(USDC).transferFrom(msg.sender, team_address, priceforpresale*50/100);
+        IERC20(USDC).transferFrom(msg.sender, mainPair, priceforpresale*50/100);
+        _transfer(address(token_distributor), msg.sender, numforpresale*50/100);
+        _transfer(address(token_distributor), mainPair, numforpresale*50/100);
+        bought[msg.sender]=true;
+        ISwapPair(mainPair).sync();
+    }
+
+    function open(bool enable) public onlyOwner {
+        ido_opening = enable;
+    }
+
+    function _transfer(
+        address from, 
+        address to,
+        uint256 amount
+    ) private {
+        require(from != address(0), "Transfer from the zero address");
+        require(to != address(0), "Transfer to the zero address");
+        require(amount > 0, "Transfer amount must be greater than zero");
+
+        bool pay_tax = false;
+        // 判断是否交易
+        if (from == mainPair || to == mainPair) {
+            if (!_feeWhiteList[from] && !_feeWhiteList[to]) {
+                pay_tax = true;
+            }
+            if (0 == startTradeBlock) {
+                require(
+                    _feeWhiteList[from] || _feeWhiteList[to],
+                    "Trade not start"
+                );
+                startTradeBlock = block.number;
+            }
+
+            // 判断是否卖币
+            uint256 contract_balance = balanceOf(address(this));
+            bool need_sell = contract_balance >= NumSelltoFund;
+            if (need_sell && !in_swap && from != mainPair && startTradeBlock > 0) {
+                SwapTokenToFund(contract_balance);
+            }
+        }
+        _tokenTransfer(from, to, amount, pay_tax);
+    }
+
+    function _tokenTransfer(
+        address sender,
+        address recipient,
+        uint256 tAmount,
+        bool pay_tax
+    ) private {
+        //转出者减少余额
+        _balances[sender] = _balances[sender] - tAmount;
+
+        if(pay_tax){
+            // 买入
+            if(sender == mainPair){
+                uint256 buyfee;
+                buyfee = tAmount * 3 / 100;
+                // 销毁1.5%，团队留1.5%
+                _takeTransfer(sender,DEAD,buyfee* 50/100);
+                _takeTransfer(sender,address(this),buyfee* 50/100);
+                tAmount = tAmount - buyfee;
+            }else{
+            // 卖出
+                uint256 sellfee;
+                sellfee = tAmount * 5 / 100;
+                // 销毁2%，团队留3%
+                _takeTransfer(sender,DEAD,sellfee* 40/100);
+                _takeTransfer(sender,address(this),sellfee* 60/100);
+                tAmount = tAmount - sellfee;
+            }
+        }
+
+        //接收者增加余额
+        _takeTransfer(sender, recipient, tAmount);
+    }
+
+    function _takeTransfer(
+        address sender,
+        address to,
+        uint256 tAmount
+    ) private {
+        _balances[to] = _balances[to] + tAmount;
+        emit Transfer(sender, to, tAmount);
+    }
+
+    function SwapTokenToFund(uint256 amount) private lock_swap {
+        address[] memory path = new address[](2);
+        path[0] = address(this);
+        path[1] = USDC;
+        _router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            amount,
+            0,
+            path,
+            address(token_distributor),
+            block.timestamp
+        );
+        uint256 usdc_amount;
+        usdc_amount = IERC20(USDC).balanceOf(address(token_distributor));
+        IERC20(USDC).transferFrom(
+            address(token_distributor),
+            fund_address,
+            usdc_amount
+        );
+    }
+
+    function set_whitelist(address _add,bool enable)public onlyOwner{
+        _feeWhiteList[_add] = enable;
     }
 
     function symbol() external view override returns (string memory) {
@@ -230,16 +397,6 @@ abstract contract AbsToken is IERC20, Ownable {
         emit Approval(owner, spender, amount);
     }
 
-    function _transfer(address from, address to, uint256 amount) private {
-        require(from != address(0), "ERC20: transfer from the zero address");
-        require(to != address(0), "ERC20: transfer to the zero address");
-        require(amount > 0, "Transfer amount must be greater than zero");
-
-        _balances[from] = _balances[from] - amount;
-        _balances[to] = _balances[to] + amount;
-        emit Transfer(from, to,amount);
-    }
-
     //表示能接收主链币
     receive() external payable {}
 
@@ -250,13 +407,13 @@ contract wsjtoken is AbsToken {
     constructor()
         AbsToken(
             //名称
-            "RTestCoin",
+            "IDOBI_V2",
             //符号
-            "Rt",
+            "IBV2",
             //精度
             18,
             //总量
-            100000000000000
+            1000000
         ){}
 
 }

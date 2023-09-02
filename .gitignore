@@ -1,4 +1,5 @@
 /node_modules
+npm
 artifacts
 /contract/artifacts
 /contract/just_test/artifacts

@@ -86,6 +86,11 @@ interface ISwapFactory {
     ) external returns (address pair);
 }
 
+
+interface ISwapPair {
+    function sync() external;
+}
+
 abstract contract Ownable {
     address private _owner;
 

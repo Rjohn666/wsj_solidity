@@ -1,397 +1,958 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7;
+/**
+ *Submitted for verification at BscScan.com on 2023-08-26
+*/
 
-// IERC20 代币协议规范，任何人都可以发行代币，只要编写的智能合约里包含以下指定方法，在公链上，就被认为是一个代币合约
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.19;
+
 interface IERC20 {
-    //精度，表明代币的精度是多少，即小数位有多少位
     function decimals() external view returns (uint8);
 
-    //代币符号，一般看到的就是代币符号
     function symbol() external view returns (string memory);
 
-    //代币名称，一般是具体的有意义的英文名称
     function name() external view returns (string memory);
 
-    //代币发行的总量，现在很多代币发行后总量不会改变，有些挖矿的币，总量会随着挖矿产出增多，有些代币的模式可能会通缩，即总量会变少
     function totalSupply() external view returns (uint256);
 
-    //某个账户地址的代币余额，即某地址拥有该代币资产的数量
     function balanceOf(address account) external view returns (uint256);
 
-    //转账，可以将代币转给别人，这种情况是资产拥有的地址主动把代币转给别人
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool);
+    function transfer(address recipient, uint256 amount) external returns (bool);
 
-    //授权额度，某个账户地址授权给使用者使用自己代币的额度，一般是授权给智能合约，让智能合约划转自己的资产
-    function allowance(address owner, address spender)
-        external
-        view
-        returns (uint256);
+    function allowance(address owner, address spender) external view returns (uint256);
 
-    //授权，将自己的代币资产授权给其他人使用，一般是授权给智能合约，请尽量不要授权给不明来源的智能合约，有可能会转走你的资产，
     function approve(address spender, uint256 amount) external returns (bool);
 
-    //将指定账号地址的资产转给指定的接收地址，一般是智能合约调用，需要搭配上面的授权方法使用，授权了才能划转别人的代币资产
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
 
-    //转账事件，一般区块浏览器是根据该事件来做代币转账记录，事件会存在公链节点的日志系统里
     event Transfer(address indexed from, address indexed to, uint256 value);
-    //授权事件
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 value
-    );
-}
-
-// Dex Swap 路由接口，实际上接口方法比这里写的还要更多一些，本代币合约里只用到以下方法
-interface ISwapRouter {
-    //路由的工厂方法，用于创建代币交易对
-    function factory() external pure returns (address);
-
-    //将指定数量的代币path[0]兑换为另外一种代币path[path.length-1]，支持手续费滑点
-    function swapExactTokensForTokensSupportingFeeOnTransferTokens(
-        uint256 amountIn,
-        uint256 amountOutMin,
-        address[] calldata path,
-        address to,
-        uint256 deadline
-    ) external;
-
-    //添加代币 tokenA、tokenB 交易对流动性
-    function addLiquidity(
-        address tokenA,
-        address tokenB,
-        uint256 amountADesired,
-        uint256 amountBDesired,
-        uint256 amountAMin,
-        uint256 amountBMin,
-        address to,
-        uint256 deadline
-    )
-        external
-        returns (
-            uint256 amountA,
-            uint256 amountB,
-            uint256 liquidity
-        );
-}
-
-interface ISwapFactory {
-    //创建代币 tokenA、tokenB 的交易对，也就是常说的 LP，LP 交易对本身也是一种代币
-    function createPair(address tokenA, address tokenB)
-        external
-        returns (address pair);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
 abstract contract Ownable {
-    address private _owner;
+    address internal _owner;
 
-    event OwnershipTransferred(
-        address indexed previousOwner,
-        address indexed newOwner
-    );
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
-    constructor() {
+    constructor () {
         address msgSender = msg.sender;
-        //合约创建者拥有权限，也可以填写具体的地址
         _owner = msgSender;
         emit OwnershipTransferred(address(0), msgSender);
     }
 
-    //查看权限在哪个地址上
     function owner() public view returns (address) {
         return _owner;
     }
 
-    //拥有权限才能调用
     modifier onlyOwner() {
-        require(_owner == msg.sender, "Ownable: caller is not the owner");
+        require(_owner == msg.sender, "!o");
         _;
     }
 
-    //放弃权限
     function renounceOwnership() public virtual onlyOwner {
         emit OwnershipTransferred(_owner, address(0));
         _owner = address(0);
     }
 
-    //转移权限
     function transferOwnership(address newOwner) public virtual onlyOwner {
-        require(
-            newOwner != address(0),
-            "Ownable: new owner is the zero address"
-        );
+        require(newOwner != address(0), "n0");
         emit OwnershipTransferred(_owner, newOwner);
         _owner = newOwner;
     }
 }
 
-//这个合约用于暂存USDT，用于回流和营销钱包，分红
-contract TokenDistributor {
-    //构造参数传USDT合约地址
-    constructor(address token) {
-        //将暂存合约的USDT授权给合约创建者，这里的创建者是代币合约，授权数量为最大整数
-        IERC20(token).approve(msg.sender, uint256(~uint256(0)));
-    }
+interface INFT {
+    function addTokenReward(uint256 rewardAmount) external;
 }
 
-abstract contract AbsToken is IERC20, Ownable {
-    //用于存储每个地址的余额数量
-    mapping(address => uint256) private _balances;
-    //存储授权数量，资产拥有者 owner => 授权调用方 spender => 授权数量
-    mapping(address => mapping(address => uint256)) private _allowances;
-    string private _name; //名称
-    string private _symbol; //符号
-    uint8 private _decimals; //精度
+interface ISwapRouter {
+    function factory() external pure returns (address);
 
-    // 销毁税
-    uint8 private burnfee = 5;
-    // 团队税
-    uint8 private fundfee = 5;
-    address private fund_address;
+    function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts);
 
-    uint256 private constant MAX = ~uint256(0);
-    uint256 private _tTotal; //总量
-    address DEAD = 0x000000000000000000000000000000000000dEaD;
-    address private usdc;
-    address private mainPair;
-    mapping(address => bool) private _feeWhiteList;
+    function swapExactTokensForTokensSupportingFeeOnTransferTokens(
+        uint amountIn,
+        uint amountOutMin,
+        address[] calldata path,
+        address to,
+        uint deadline
+    ) external;
 
-    ISwapRouter public _router;
-    TokenDistributor public token_distributor;
+    function addLiquidity(
+        address tokenA,
+        address tokenB,
+        uint amountADesired,
+        uint amountBDesired,
+        uint amountAMin,
+        uint amountBMin,
+        address to,
+        uint deadline
+    ) external returns (uint amountA, uint amountB, uint liquidity);
+}
 
-    uint256 NumSelltoFund;
-    bool in_swap;
+interface ISwapFactory {
+    function getPair(address tokenA, address tokenB) external view returns (address pair);
+}
 
-    modifier lock_swap() {
-        in_swap = true;
-        _;
-        in_swap = false;
+interface ISwapPair {
+    function getReserves() external view returns (uint112 reserve0, uint112 reserve1, uint32 blockTimestampLast);
+}
+
+interface IToken {
+    function giveMintReward() external;
+
+    function addUserLPAmount(address account, uint256 lpAmount) external;
+}
+
+abstract contract AbsLPPool is Ownable {
+    struct UserInfo {
+        bool isActive;
+        uint256 amount;
+        uint256 rewardMintDebt;
+        uint256 calMintReward;
+    }
+
+    struct PoolInfo {
+        uint256 totalAmount;
+        uint256 accMintPerShare;
+        uint256 accMintReward;
+        uint256 mintPerSec;
+        uint256 lastMintTime;
+        uint256 totalMintReward;
+    }
+
+    struct UserLPInfo {
+        uint256 lockAmount;
+        uint256 calAmount;
+        uint256 claimedAmount;
+        uint256 lastReleaseTime;
+        //
+        uint256 releaseInitAmount;
+        //
+        uint256 releaseDuration;
+        uint256 speedUpTime;
+    }
+
+    PoolInfo private poolInfo;
+    mapping(address => UserInfo) private userInfo;
+    mapping(address => UserLPInfo) private _userLPInfo;
+
+    ISwapRouter private immutable _swapRouter;
+    address private immutable _usdt;
+    uint256 private _minAmount;
+    address private immutable _mintRewardToken;
+    address public immutable _lp;
+    INFT public _nft;
+
+    mapping(address => address) public _invitor;
+    mapping(address => address[]) public _binder;
+    mapping(uint256 => uint256) public _inviteFee;
+    uint256 private constant _inviteLen = 5;
+    address private _defaultInvitor;
+
+    mapping(address => uint256) private _inviteAmount;
+    mapping(address => uint256) private _teamAmount;
+    mapping(address => uint256) private _teamNum;
+
+    bool public _pauseSell;
+    uint256 public _sellSelfRate = 5000;
+    uint256 public _sellJoinRate = 4000;
+    uint256 public _sellNFTRate = 500;
+    address public _sellLPReceiver;
+    mapping(address => uint256) private _sellJoinAmount;
+    address public _fundAddress;
+
+    function setPauseSell(bool p) external onlyWhiteList {
+        _pauseSell = p;
+    }
+
+    function setSellSelfRate(uint256 r) external onlyWhiteList {
+        _sellSelfRate = r;
+        require(_sellSelfRate + _sellJoinRate + _sellNFTRate <= 10000, "T1w");
+    }
+
+    function setSellJoinRate(uint256 r) external onlyWhiteList {
+        _sellJoinRate = r;
+        require(_sellSelfRate + _sellJoinRate + _sellNFTRate <= 10000, "T1w");
+    }
+
+    function setSellNFTRate(uint256 r) external onlyWhiteList {
+        _sellNFTRate = r;
+        require(_sellSelfRate + _sellJoinRate + _sellNFTRate <= 10000, "T1w");
+    }
+
+    function setSellLPReceiver(address a) external onlyWhiteList {
+        _sellLPReceiver = a;
+    }
+
+    function setFundAddress(address a) external onlyWhiteList {
+        _fundAddress = a;
+    }
+
+    //
+    function sell(uint256 tokenAmount) public {
+        address account = msg.sender;
+        require(account == tx.origin, "notOrigin");
+
+        _bindInvitor(account, _defaultInvitor);
+
+        require(!_pauseSell, "PS");
+        _takeToken(_mintRewardToken, account, address(this), tokenAmount);
+
+        address usdt = _usdt;
+        IERC20 USDT = IERC20(usdt);
+        uint256 usdtBalanceBefore = USDT.balanceOf(address(this));
+
+        address[] memory path = new address[](2);
+        path[0] = _mintRewardToken;
+        path[1] = usdt;
+        _swapRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            tokenAmount, 0, path, address(this), block.timestamp
+        );
+
+        uint256 usdtAmount = USDT.balanceOf(address(this)) - usdtBalanceBefore;
+        uint256 selfUsdt = usdtAmount * _sellSelfRate / 10000;
+        _giveToken(usdt, account, selfUsdt);
+
+        uint256 sellJoinUsdt = usdtAmount * _sellJoinRate / 10000;
+        addLP(account, sellJoinUsdt, 0, false);
+
+        _updatePool();
+        uint256 sellJoinAmount = sellJoinUsdt * _lastAmountRate / _divFactor;
+        _addUserAmount(account, sellJoinAmount, false);
+        _sellJoinAmount[account] += sellJoinAmount;
+
+        uint256 nftUsdt = usdtAmount * _sellNFTRate / 10000;
+        _giveToken(usdt, address(_nft), nftUsdt);
+        _nft.addTokenReward(nftUsdt);
+
+        uint256 fundUsdt = usdtAmount - selfUsdt - sellJoinUsdt - nftUsdt;
+        _giveToken(usdt, _fundAddress, fundUsdt);
+
+        IToken(_mintRewardToken).giveMintReward();
+    }
+
+    bool private _pauseJoin = true;
+    uint256 public _lastDailyUpTime;
+    uint256 public _lastAmountRate = 10000;
+    uint256 public _amountDailyUp = 10100;
+    uint256 private constant _divFactor = 10000;
+    uint256 private constant _dailyDuration = 1 days;
+
+    uint256 public _lpReleaseDuration = 183 days;
+    //
+    uint256 private _speedUpCost;
+    uint256 public _speedUpDuration = 30 days;
+    address public _speedUpReceiver = address(0x000000000000000000000000000000000000dEaD);
+    uint256 private _speedUpMaxTime = 3;
+
+    function setSpeedUpMaxTime(uint256 mt) external onlyWhiteList {
+        _speedUpMaxTime = mt;
+    }
+
+    function setSpeedUpCost(uint256 c) external onlyWhiteList {
+        _speedUpCost = c;
+    }
+
+    function setSpeedUpDuration(uint256 d) external onlyWhiteList {
+        _speedUpDuration = d;
+    }
+
+    function setSeedUpReceiver(address a) external onlyWhiteList {
+        _speedUpReceiver = a;
+    }
+
+    function setLPReleaseDuration(uint256 d) external onlyWhiteList {
+        require(d > 0, "gt0");
+        _lpReleaseDuration = d;
+    }
+
+    function setAmountDailyUp(uint256 r) external onlyWhiteList {
+        _amountDailyUp = r;
+    }
+
+    function setLastDailyUpTime(uint256 t) external onlyWhiteList {
+        _lastDailyUpTime = t;
+    }
+
+    function setLastAmountRate(uint256 r) external onlyWhiteList {
+        _lastAmountRate = r;
+    }
+
+    function _updateDailyUpRate() public {
+        uint256 lastDailyUpTime = _lastDailyUpTime;
+        if (0 == lastDailyUpTime) {
+            return;
+        }
+        uint256 dailyDuration = _dailyDuration;
+        uint256 nowTime = block.timestamp;
+        if (nowTime < lastDailyUpTime + dailyDuration) {
+            return;
+        }
+        uint256 ds = (nowTime - lastDailyUpTime) / dailyDuration;
+        _lastDailyUpTime = lastDailyUpTime + ds * dailyDuration;
+
+        uint256 lastAmountRate = _lastAmountRate;
+        uint256 amountDailyUp = _amountDailyUp;
+        for (uint256 i; i < ds; ++i) {
+            lastAmountRate = lastAmountRate * amountDailyUp / _divFactor;
+        }
+        _lastAmountRate = lastAmountRate;
+    }
+
+    function getDailyRate() private view returns (uint256) {
+        uint256 lastAmountRate = _lastAmountRate;
+        uint256 lastDailyUpTime = _lastDailyUpTime;
+        if (0 == lastDailyUpTime) {
+            return lastAmountRate;
+        }
+        uint256 dailyDuration = _dailyDuration;
+        uint256 nowTime = block.timestamp;
+        if (nowTime < lastDailyUpTime + dailyDuration) {
+            return lastAmountRate;
+        }
+        uint256 ds = (nowTime - lastDailyUpTime) / dailyDuration;
+
+        uint256 amountDailyUp = _amountDailyUp;
+        for (uint256 i; i < ds; ++i) {
+            lastAmountRate = lastAmountRate * amountDailyUp / _divFactor;
+        }
+        return lastAmountRate;
+    }
+
+    function open() external onlyWhiteList {
+        if (0 == _lastDailyUpTime) {
+            _lastDailyUpTime = block.timestamp;
+        }
+        _pauseJoin = false;
+    }
+
+    function close() external onlyWhiteList {
+        _pauseJoin = true;
     }
 
     constructor(
-        string memory Name,
-        string memory Symbol,
-        uint8 Decimals,
-        uint256 Supply
-    ) {
-        _name = Name;
-        _symbol = Symbol;
-        _decimals = Decimals;
+        address SwapRouter,
+        address USDT,
+        address MintRewardToken,
+        address NFT,
+        address DefaultInvitor,
+        address FundAddress
+    ){
+        _swapRouter = ISwapRouter(SwapRouter);
+        _usdt = USDT;
+        _minAmount = 100 * 10 ** IERC20(USDT).decimals();
+        _nft = INFT(NFT);
+        _mintRewardToken = MintRewardToken;
+        _lp = ISwapFactory(_swapRouter.factory()).getPair(USDT, MintRewardToken);
+        poolInfo.lastMintTime = block.timestamp;
+        _defaultInvitor = DefaultInvitor;
+        userInfo[DefaultInvitor].isActive = true;
+        _inviteFee[0] = 1000;
+        _inviteFee[1] = 800;
+        _inviteFee[2] = 600;
+        _inviteFee[3] = 500;
+        _inviteFee[4] = 400;
+        _speedUpCost = 300 * 10 ** IERC20(_usdt).decimals();
 
-        //本合约的持币上限，超过时卖出分红
-        NumSelltoFund = 10 * 10 ** _decimals;
+        safeApprove(USDT, SwapRouter, ~uint256(0));
+        safeApprove(MintRewardToken, SwapRouter, ~uint256(0));
 
-        //总量
-        _tTotal = Supply * 10**_decimals;
-
-        //初始代币转给营销钱包
-        fund_address = msg.sender;
-        _balances[msg.sender] = _tTotal;
-        emit Transfer(address(0), tx.origin, _tTotal);
-
-        //创建交易对
-        usdc = address(0x07865c6E87B9F70255377e024ace6630C1Eaa37F);
-        _router = ISwapRouter(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-        mainPair = ISwapFactory(_router.factory()).createPair(
-            address(this),
-            usdc
-        );
-        _allowances[address(this)][address(_router)] = MAX;
-        IERC20(usdc).approve(address(_router), MAX);
-
-        // 创建代收U的子合约，授权给本合约用于操作分账
-        token_distributor = new TokenDistributor(usdc);
-
-        // 设置白名单地址
-        _feeWhiteList[msg.sender] = true;
-        _feeWhiteList[address(_router)] = true;
-        _feeWhiteList[address(this)] = true;
+        _sellLPReceiver = FundAddress;
+        _fundAddress = FundAddress;
     }
 
-    //表示能接收主链币
     receive() external payable {}
 
-    function _transfer(
-        address from,
-        address to,
-        uint256 amount
-    ) private {
-        require(from != address(0), "Transfer from the zero address");
-        require(to != address(0), "Transfer to the zero address");
-        require(amount > 0, "Transfer amount must be greater than zero");
+    uint256 private _totalUsdt;
 
-        bool pay_tax = false;
-        // 判断是否交易
-        if (from == mainPair || to == mainPair) {
-            if (!_feeWhiteList[from] && !_feeWhiteList[to]) {
-                pay_tax = true;
-            }
+    //
+    function deposit(uint256 amount, uint256 minTokenAmount, address invitor) external {
+        require(!_pauseJoin, "pause");
 
-            uint256 contract_balance = balanceOf(address(this));
-            bool need_sell = contract_balance >= NumSelltoFund;
-            if (need_sell && !in_swap && from != mainPair) {
-                SwapTokenToFund(contract_balance);
-            }
-        }
+        require(amount >= _minAmount, "m");
+        address account = msg.sender;
+        require(account == tx.origin, "notOrigin");
 
-        _tokenTransfer(from, to, amount, pay_tax);
+        _totalUsdt += amount;
+
+        _bindInvitor(account, invitor);
+
+        _takeToken(_usdt, account, address(this), amount);
+
+        addLP(account, amount, minTokenAmount, true);
+
+        _updatePool();
+        _addUserAmount(account, amount * _lastAmountRate / _divFactor, true);
+
+        IToken(_mintRewardToken).giveMintReward();
     }
 
-    function _tokenTransfer(
-        address sender,
-        address recipient,
-        uint256 tAmount,
-        bool pay_tax
-    ) private {
-        //转出者减少余额
-        _balances[sender] = _balances[sender] - tAmount;
+    //
+    function addLP(address account, uint256 usdtAmount, uint256 minTokenAmount, bool lockLP) private {
+        address token = _mintRewardToken;
+        IERC20 Token = IERC20(token);
+        uint256 tokenBalanceBefore = Token.balanceOf(address(this));
 
-        // 是否扣税
-        if (pay_tax) {
-            // 销毁
-            uint256 burn_amount;
-            burn_amount = (tAmount * burnfee) / 100;
-            _takeTransfer(sender, DEAD, burn_amount);
-
-            // 预留
-            uint256 fund_amount;
-            fund_amount = (tAmount * fundfee) / 100;
-            _takeTransfer(sender, address(this), fund_amount);
-
-            // 实际到账数量 = 原到账数量 - 税
-            tAmount = tAmount - burn_amount - fund_amount;
-        }
-
-        //接收者增加余额
-        _takeTransfer(sender, recipient, tAmount);
-    }
-
-    function _takeTransfer(
-        address sender,
-        address to,
-        uint256 tAmount
-    ) private {
-        _balances[to] = _balances[to] + tAmount;
-        emit Transfer(sender, to, tAmount);
-    }
-
-    function SwapTokenToFund(uint256 amount) private lock_swap {
+        address usdt = _usdt;
         address[] memory path = new address[](2);
-        path[0] = address(this);
-        path[1] = usdc;
-        _router.swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            amount,
-            0,
-            path,
-            address(token_distributor),
-            block.timestamp
+        path[0] = usdt;
+        path[1] = token;
+        _swapRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            usdtAmount / 2, minTokenAmount, path, address(this), block.timestamp
         );
-        uint256 usdc_amount;
-        IERC20 USDC = IERC20(usdc);
-        usdc_amount = USDC.balanceOf(address(token_distributor));
-        USDC.transferFrom(
-            address(token_distributor),
-            fund_address,
-            usdc_amount
+
+        uint256 tokenAmount = Token.balanceOf(address(this)) - tokenBalanceBefore;
+
+        address lpReceiver = lockLP ? address(this) : _sellLPReceiver;
+        (, , uint liquidity) = _swapRouter.addLiquidity(
+            usdt, token,
+            usdtAmount / 2, tokenAmount,
+            0, 0,
+            lpReceiver, block.timestamp
         );
-    }
-
-    function set_whitelist(address _add,bool enable)public onlyOwner{
-        _feeWhiteList[_add] = enable;
-    }
-
-    function symbol() external view override returns (string memory) {
-        return _symbol;
-    }
-
-    function name() external view override returns (string memory) {
-        return _name;
-    }
-
-    function decimals() external view override returns (uint8) {
-        return _decimals;
-    }
-
-    function totalSupply() external view override returns (uint256) {
-        return _tTotal;
-    }
-
-    function balanceOf(address account) public view override returns (uint256) {
-        return _balances[account];
-    }
-
-    function transfer(address recipient, uint256 amount)
-        public
-        override
-        returns (bool)
-    {
-        _transfer(msg.sender, recipient, amount);
-        return true;
-    }
-
-    function allowance(address owner, address spender)
-        public
-        view
-        override
-        returns (uint256)
-    {
-        return _allowances[owner][spender];
-    }
-
-    function approve(address spender, uint256 amount)
-        public
-        override
-        returns (bool)
-    {
-        _approve(msg.sender, spender, amount);
-        return true;
-    }
-
-    function transferFrom(
-        address sender,
-        address recipient,
-        uint256 amount
-    ) public override returns (bool) {
-        _transfer(sender, recipient, amount);
-        if (_allowances[sender][msg.sender] != MAX) {
-            _allowances[sender][msg.sender] =
-                _allowances[sender][msg.sender] -
-                amount;
+        //
+        if (lockLP) {
+            _addLockLP(account, liquidity);
+        } else {
+            IToken(_mintRewardToken).addUserLPAmount(lpReceiver, liquidity);
         }
-        return true;
     }
 
-    function _approve(
-        address owner,
-        address spender,
-        uint256 amount
-    ) private {
-        require(owner != address(0), "approve from the zero address");
-        require(spender != address(0), "approve to the zero address");
+    //
+    function _addLockLP(address account, uint liquidity) private {
+        UserLPInfo storage userLPInfo = _userLPInfo[account];
+        uint256 lastReleaseTime = userLPInfo.lastReleaseTime;
+        uint256 nowTime = block.timestamp;
+        if (lastReleaseTime > 0 && nowTime > lastReleaseTime) {
+            uint256 releaseAmount = userLPInfo.releaseInitAmount * (nowTime - lastReleaseTime) / userLPInfo.releaseDuration;
+            uint256 maxAmount = userLPInfo.lockAmount - userLPInfo.calAmount - userLPInfo.claimedAmount;
+            if (releaseAmount > maxAmount) {
+                releaseAmount = maxAmount;
+            }
+            userLPInfo.calAmount += releaseAmount;
+        }
+        uint256 remainAmount = userLPInfo.lockAmount - userLPInfo.calAmount - userLPInfo.claimedAmount;
+        userLPInfo.lockAmount += liquidity;
+        userLPInfo.releaseInitAmount = remainAmount + liquidity;
+        userLPInfo.releaseDuration = _lpReleaseDuration;
 
-        _allowances[owner][spender] = amount;
-        emit Approval(owner, spender, amount);
+        if (nowTime > lastReleaseTime) {
+            userLPInfo.lastReleaseTime = nowTime;
+        }
+    }
+
+    //
+    function claimLP() public {
+        address account = msg.sender;
+        require(account == tx.origin, "notOrigin");
+        UserLPInfo storage userLPInfo = _userLPInfo[account];
+        uint256 lastReleaseTime = userLPInfo.lastReleaseTime;
+        uint256 nowTime = block.timestamp;
+        if (lastReleaseTime > 0 && nowTime > lastReleaseTime) {
+            uint256 releaseAmount = userLPInfo.releaseInitAmount * (nowTime - lastReleaseTime) / userLPInfo.releaseDuration;
+            uint256 maxAmount = userLPInfo.lockAmount - userLPInfo.calAmount - userLPInfo.claimedAmount;
+            if (releaseAmount > maxAmount) {
+                releaseAmount = maxAmount;
+            }
+            userLPInfo.calAmount += releaseAmount;
+        }
+
+        uint256 calAmount = userLPInfo.calAmount;
+        if (calAmount > 0) {
+            _giveToken(_lp, account, calAmount);
+            userLPInfo.calAmount = 0;
+            userLPInfo.claimedAmount += calAmount;
+            IToken(_mintRewardToken).addUserLPAmount(account, calAmount);
+        }
+
+        if (nowTime > lastReleaseTime) {
+            userLPInfo.lastReleaseTime = nowTime;
+        }
+
+        IToken(_mintRewardToken).giveMintReward();
+    }
+
+    //
+    function speedUpLP(uint256 maxTokenAmount) public {
+        address account = msg.sender;
+        require(account == tx.origin, "notOrigin");
+        UserLPInfo storage userLPInfo = _userLPInfo[account];
+        uint256 lastReleaseTime = userLPInfo.lastReleaseTime;
+        uint256 nowTime = block.timestamp;
+        if (lastReleaseTime > 0 && nowTime > lastReleaseTime) {
+            uint256 releaseAmount = userLPInfo.releaseInitAmount * (nowTime - lastReleaseTime) / userLPInfo.releaseDuration;
+            uint256 maxAmount = userLPInfo.lockAmount - userLPInfo.calAmount - userLPInfo.claimedAmount;
+            if (releaseAmount > maxAmount) {
+                releaseAmount = maxAmount;
+            }
+            userLPInfo.calAmount += releaseAmount;
+        }
+
+        if (nowTime > lastReleaseTime) {
+            userLPInfo.lastReleaseTime = nowTime;
+        }
+
+        require(userLPInfo.speedUpTime < _speedUpMaxTime, "MT");
+        userLPInfo.speedUpTime++;
+        uint256 tokenAmount = getSpeedUpTokenAmount();
+        require(tokenAmount <= maxTokenAmount, "MA");
+        _takeToken(_mintRewardToken, account, _speedUpReceiver, tokenAmount);
+
+        //
+        uint256 remainAmount = userLPInfo.lockAmount - userLPInfo.calAmount - userLPInfo.claimedAmount;
+        uint256 remainDuration = remainAmount * userLPInfo.releaseDuration / userLPInfo.releaseInitAmount;
+
+        //
+        userLPInfo.releaseInitAmount = remainAmount;
+        uint256 speedUpDuration = _speedUpDuration;
+        require(remainDuration > speedUpDuration, "RltS");
+        userLPInfo.releaseDuration = remainDuration - speedUpDuration;
+
+        IToken(_mintRewardToken).giveMintReward();
+    }
+
+    function getSpeedUpTokenAmount() private view returns (uint256 tokenAmount){
+        (uint256 rUsdt, uint256 rToken) = _getReserves();
+        tokenAmount = _speedUpCost * rToken / rUsdt;
+    }
+
+    function _getReserves() public view returns (uint256 rUsdt, uint256 rToken){
+        ISwapPair pair = ISwapPair(_lp);
+        (uint r0, uint256 r1,) = pair.getReserves();
+
+        if (_usdt < _mintRewardToken) {
+            rUsdt = r0;
+            rToken = r1;
+        } else {
+            rUsdt = r1;
+            rToken = r0;
+        }
+    }
+
+    function getJoinTokenAmountOut(uint256 usdtAmount) public view returns (uint256 tokenAmount){
+        address[] memory path = new address[](2);
+        path[0] = _usdt;
+        path[1] = _mintRewardToken;
+        uint256[] memory amounts = _swapRouter.getAmountsOut(usdtAmount / 2, path);
+        tokenAmount = amounts[1];
+    }
+
+    function getSellUsdtOut(uint256 tokenAmount) public view returns (
+        uint256 usdtAmount, uint256 selfUsdt, uint256 mintAmount
+    ){
+        address[] memory path = new address[](2);
+        path[0] = _mintRewardToken;
+        path[1] = _usdt;
+        uint256[] memory amounts = _swapRouter.getAmountsOut(tokenAmount, path);
+        usdtAmount = amounts[1];
+        selfUsdt = usdtAmount * _sellSelfRate / 10000;
+        mintAmount = usdtAmount * _sellJoinRate / 10000;
+        mintAmount = mintAmount * getDailyRate() / 10000;
+    }
+
+    //
+    function _addUserAmount(address account, uint256 amount, bool calInvite) private {
+        UserInfo storage user = userInfo[account];
+        _calReward(user, false);
+
+        uint256 userAmount = user.amount;
+        userAmount += amount;
+        user.amount = userAmount;
+
+        uint256 poolTotalAmount = poolInfo.totalAmount;
+        poolTotalAmount += amount;
+
+        uint256 poolAccMintPerShare = poolInfo.accMintPerShare;
+        user.rewardMintDebt = userAmount * poolAccMintPerShare / 1e18;
+
+        if (calInvite) {
+            uint256 len = _inviteLen;
+            UserInfo storage invitorInfo;
+            address current = account;
+            address invitor;
+            uint256 invitorTotalAmount;
+            for (uint256 i; i < len; ++i) {
+                invitor = _invitor[current];
+                if (address(0) == invitor) {
+                    break;
+                }
+                invitorInfo = userInfo[invitor];
+                _calReward(invitorInfo, false);
+                uint256 inviteAmount = amount * _inviteFee[i] / 10000;
+                _inviteAmount[invitor] += inviteAmount;
+                _teamAmount[invitor] += amount;
+
+                invitorTotalAmount = invitorInfo.amount;
+                invitorTotalAmount += inviteAmount;
+                invitorInfo.amount = invitorTotalAmount;
+                invitorInfo.rewardMintDebt = invitorTotalAmount * poolAccMintPerShare / 1e18;
+
+                poolTotalAmount += inviteAmount;
+                current = invitor;
+            }
+        }
+        poolInfo.totalAmount = poolTotalAmount;
+    }
+
+    //
+    function addUserAmount(address account, uint256 amount, bool calInvite) public {
+        require(_inProject[msg.sender], "rq project");
+        _bindInvitor(account, _defaultInvitor);
+        _updatePool();
+        _addUserAmount(account, amount, calInvite);
+    }
+
+    //
+    function addMintAmount(address account, uint256 amount) external onlyWhiteList {
+        _bindInvitor(account, _defaultInvitor);
+        _updatePool();
+        _addUserAmount(account, amount, false);
+    }
+
+    //
+    function claim() public {
+        address account = msg.sender;
+        UserInfo storage user = userInfo[account];
+        _calReward(user, true);
+        uint256 pendingMint = user.calMintReward;
+        if (pendingMint > 0) {
+            _giveToken(_mintRewardToken, account, pendingMint);
+            user.calMintReward = 0;
+        }
+
+        IToken(_mintRewardToken).giveMintReward();
+    }
+
+    //
+    function _updatePool() private {
+        _updateDailyUpRate();
+        PoolInfo storage pool = poolInfo;
+        uint256 blockTime = block.timestamp;
+        uint256 lastRewardTime = pool.lastMintTime;
+        if (blockTime <= lastRewardTime) {
+            return;
+        }
+        pool.lastMintTime = blockTime;
+
+        uint256 accReward = pool.accMintReward;
+        uint256 totalReward = pool.totalMintReward;
+        if (accReward >= totalReward) {
+            return;
+        }
+
+        uint256 totalAmount = pool.totalAmount;
+        uint256 rewardPerSec = pool.mintPerSec;
+        if (0 < totalAmount && 0 < rewardPerSec) {
+            uint256 reward = rewardPerSec * (blockTime - lastRewardTime);
+            uint256 remainReward = totalReward - accReward;
+            if (reward > remainReward) {
+                reward = remainReward;
+            }
+            pool.accMintPerShare += reward * 1e18 / totalAmount;
+            pool.accMintReward += reward;
+        }
+    }
+
+    //
+    function _calReward(UserInfo storage user, bool updatePool) private {
+        if (updatePool) {
+            _updatePool();
+        }
+        if (user.amount > 0) {
+            uint256 accMintReward = user.amount * poolInfo.accMintPerShare / 1e18;
+            uint256 pendingMintAmount = accMintReward - user.rewardMintDebt;
+            if (pendingMintAmount > 0) {
+                user.rewardMintDebt = accMintReward;
+                user.calMintReward += pendingMintAmount;
+            }
+        }
+    }
+
+    function getPendingMintReward(address account) public view returns (uint256 reward) {
+        reward = 0;
+        PoolInfo storage pool = poolInfo;
+        UserInfo storage user = userInfo[account];
+        if (user.amount > 0) {
+            uint256 poolPendingReward;
+            uint256 blockTime = block.timestamp;
+            uint256 lastRewardTime = pool.lastMintTime;
+            if (blockTime > lastRewardTime) {
+                poolPendingReward = pool.mintPerSec * (blockTime - lastRewardTime);
+                uint256 totalReward = pool.totalMintReward;
+                uint256 accReward = pool.accMintReward;
+                uint256 remainReward;
+                if (totalReward > accReward) {
+                    remainReward = totalReward - accReward;
+                }
+                if (poolPendingReward > remainReward) {
+                    poolPendingReward = remainReward;
+                }
+            }
+            reward = user.amount * (pool.accMintPerShare + poolPendingReward * 1e18 / pool.totalAmount) / 1e18 - user.rewardMintDebt;
+        }
+    }
+
+    function viewPoolInfo() public view returns (
+        uint256 totalAmount,
+        uint256 accMintPerShare, uint256 accMintReward,
+        uint256 mintPerSec, uint256 lastMintTime, uint256 totalMintReward
+    ) {
+        totalAmount = poolInfo.totalAmount;
+        accMintPerShare = poolInfo.accMintPerShare;
+        accMintReward = poolInfo.accMintReward;
+        mintPerSec = poolInfo.mintPerSec;
+        lastMintTime = poolInfo.lastMintTime;
+        totalMintReward = poolInfo.totalMintReward;
+    }
+
+    function viewUserInfo(address account) public view returns (
+        bool isActive, uint256 amount,
+        uint256 calMintReward, uint256 rewardMintDebt
+    ) {
+        UserInfo storage user = userInfo[account];
+        isActive = user.isActive;
+        amount = user.amount;
+        calMintReward = user.calMintReward;
+        rewardMintDebt = user.rewardMintDebt;
+    }
+
+    function getUserLPInfo(address account) public view returns (
+        uint256 lockAmount,
+        uint256 calAmount,
+        uint256 claimedAmount,
+        uint256 lastReleaseTime,
+        uint256 releaseInitAmount,
+        uint256 releaseDuration,
+        uint256 speedUpTime,
+        uint256 tokenBalance,
+        uint256 tokenAllowance
+    ) {
+        UserLPInfo storage userLPInfo = _userLPInfo[account];
+        lockAmount = userLPInfo.lockAmount;
+        calAmount = userLPInfo.calAmount;
+        claimedAmount = userLPInfo.claimedAmount;
+        releaseInitAmount = userLPInfo.releaseInitAmount;
+        releaseDuration = userLPInfo.releaseDuration;
+        speedUpTime = userLPInfo.speedUpTime;
+        lastReleaseTime = userLPInfo.lastReleaseTime;
+        tokenBalance = IERC20(_mintRewardToken).balanceOf(account);
+        tokenAllowance = IERC20(_mintRewardToken).allowance(account, address(this));
+    }
+
+    function getUserInfo(address account) public view returns (
+        uint256 amount, uint256 usdtBalance, uint256 usdtAllowance,
+        uint256 pendingMintReward, uint256 inviteAmount, uint256 sellJoinAmount,
+        uint256 teamNum, uint256 teamAmount
+    ) {
+        UserInfo storage user = userInfo[account];
+        amount = user.amount;
+        usdtBalance = IERC20(_usdt).balanceOf(account);
+        usdtAllowance = IERC20(_usdt).allowance(account, address(this));
+        pendingMintReward = getPendingMintReward(account) + user.calMintReward;
+        inviteAmount = _inviteAmount[account];
+        sellJoinAmount = _sellJoinAmount[account];
+        teamNum = _teamNum[account];
+        teamAmount = _teamAmount[account];
+    }
+
+    function getBaseInfo() external view returns (
+        address usdt,
+        uint256 usdtDecimals,
+        address mintRewardToken,
+        uint256 mintRewardTokenDecimals,
+        uint256 totalUsdt,
+        uint256 totalAmount,
+        uint256 lastDailyReward,
+        uint256 dailyAmountRate,
+        uint256 minAmount,
+        address defaultInvitor,
+        bool pauseJoin
+    ){
+        usdt = _usdt;
+        usdtDecimals = IERC20(usdt).decimals();
+        mintRewardToken = _mintRewardToken;
+        mintRewardTokenDecimals = IERC20(mintRewardToken).decimals();
+        totalUsdt = _totalUsdt;
+        totalAmount = poolInfo.totalAmount;
+        lastDailyReward = _lastDailyReward;
+        dailyAmountRate = getDailyRate();
+        minAmount = _minAmount;
+        defaultInvitor = _defaultInvitor;
+        pauseJoin = _pauseJoin;
+    }
+
+    function getLPInfo() external view returns (
+        uint256 totalLP,
+        uint256 lockLP,
+        uint256 speedUpMaxTime,
+        uint256 speedCostUsdt,
+        uint256 speedCostToken
+    ){
+        totalLP = IERC20(_lp).totalSupply();
+        lockLP = IERC20(_lp).balanceOf(address(this));
+        speedUpMaxTime = _speedUpMaxTime;
+        speedCostUsdt = _speedUpCost;
+        speedCostToken = getSpeedUpTokenAmount();
+    }
+
+    function getBinderLength(address account) public view returns (uint256){
+        return _binder[account].length;
+    }
+
+    //
+    function setMintPerSec(uint256 mintPerSec) external onlyWhiteList {
+        _updatePool();
+        poolInfo.mintPerSec = mintPerSec;
+    }
+
+    uint256 private _lastDailyReward;
+
+    //
+    function addTotalMintReward(uint256 reward) external {
+        require(_inProject[msg.sender], "rq project");
+        _updatePool();
+        poolInfo.totalMintReward += reward;
+        poolInfo.mintPerSec = reward / _dailyDuration;
+        _lastDailyReward = reward;
+    }
+
+    //
+    function setInviteFee(uint256 i, uint256 fee) external onlyWhiteList {
+        _inviteFee[i] = fee;
+    }
+
+    function claimBalance(address to, uint256 amount) external onlyWhiteList {
+        safeTransferETH(to, amount);
+    }
+
+    function claimToken(address token, address to, uint256 amount) external onlyWhiteList {
+        _giveToken(token, to, amount);
+    }
+
+    function setDefaultInvitor(address adr) external onlyWhiteList {
+        _defaultInvitor = adr;
+        userInfo[adr].isActive = true;
+    }
+
+    mapping(address => bool) public _inProject;
+
+    function setInProject(address adr, bool enable) external onlyWhiteList {
+        _inProject[adr] = enable;
+    }
+
+    function bindInvitor(address account, address invitor) public {
+        address caller = msg.sender;
+        require(_inProject[caller], "NA");
+        _bindInvitor(account, invitor);
+    }
+
+    function _bindInvitor(address account, address invitor) private {
+        UserInfo storage user = userInfo[account];
+        if (!user.isActive) {
+            require(address(0) != invitor, "invitor 0");
+            require(userInfo[invitor].isActive, "invitor !Active");
+            _invitor[account] = invitor;
+            _binder[invitor].push(account);
+            for (uint256 i; i < _inviteLen;) {
+                _teamNum[invitor] += 1;
+                invitor = _invitor[invitor];
+                if (address(0) == invitor) {
+                    break;
+                }
+            unchecked{
+                ++i;
+            }
+            }
+            user.isActive = true;
+        }
+    }
+
+    function getBinderList(
+        address account,
+        uint256 start,
+        uint256 length
+    ) external view returns (
+        uint256 returnCount,
+        address[] memory binders
+    ){
+        address[] storage _binders = _binder[account];
+        uint256 recordLen = _binders.length;
+        if (0 == length) {
+            length = recordLen;
+        }
+        returnCount = length;
+        binders = new address[](length);
+        uint256 index = 0;
+        for (uint256 i = start; i < start + length; i++) {
+            if (i >= recordLen) {
+                return (index, binders);
+            }
+            binders[index] = _binders[i];
+            index++;
+        }
+    }
+
+    function safeApprove(address token, address to, uint value) internal {
+        // bytes4(keccak256(bytes('approve(address,uint256)')));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x095ea7b3, to, value));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), 'AF');
+    }
+
+    function safeTransfer(address token, address to, uint value) internal {
+        // bytes4(keccak256(bytes('transfer(address,uint256)')));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0xa9059cbb, to, value));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), 'TF');
+    }
+
+    function safeTransferETH(address to, uint value) internal {
+        (bool success,) = to.call{value : value}(new bytes(0));
+        require(success, 'ETF');
+    }
+
+    function safeTransferFrom(address token, address from, address to, uint value) internal {
+        // bytes4(keccak256(bytes('transferFrom(address,address,uint256)')));
+        (bool success, bytes memory data) = token.call(abi.encodeWithSelector(0x23b872dd, from, to, value));
+        require(success && (data.length == 0 || abi.decode(data, (bool))), 'TFF');
+    }
+
+    function _giveToken(address tokenAddress, address account, uint256 amount) private {
+        if (0 == amount) {
+            return;
+        }
+        IERC20 token = IERC20(tokenAddress);
+        require(token.balanceOf(address(this)) >= amount, "PTNE");
+        safeTransfer(tokenAddress, account, amount);
+    }
+
+    function _takeToken(address tokenAddress, address from, address to, uint256 tokenNum) private {
+        IERC20 token = IERC20(tokenAddress);
+        require(token.balanceOf(address(from)) >= tokenNum, "TNE");
+        safeTransferFrom(tokenAddress, from, to, tokenNum);
+    }
+
+    modifier onlyWhiteList() {
+        address msgSender = msg.sender;
+        require(msgSender == _fundAddress || msgSender == _owner, "nw");
+        _;
     }
 }
 
-contract wsjtoken is AbsToken {
-    constructor()
-        AbsToken(
-            //名称
-            "justfortest1",
-            //符号
-            "test1",
-            //精度
-            18,
-            //总量
-            1000
-        )
-    {}
+contract MintPool is AbsLPPool {
+    constructor() AbsLPPool(
+    //SwapRouter
+        address(0x10ED43C718714eb63d5aA57B78B54704E256024E),
+    //USDT
+        address(0x55d398326f99059fF775485246999027B3197955),
+    //BOS
+        address(0x55F467206f2C06120D7bD1d98F9F470FE8511366),
+    //NFT
+        address(0x8aCD218a3354Eb35988684C75b85b7D9e6ee17B7),
+    //DefaultInvitor
+        address(0xBaFA8C9BC60CCbB5BA0dB2977d58AAD7f94855AC),
+    //Fund
+        address(0xb7F0CA77f123E83094BBCD0D06aE8c3e7Dce0569)
+    ){
+
+    }
 }
