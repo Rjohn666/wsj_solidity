@@ -272,11 +272,9 @@ abstract contract AbsToken is IERC20, Ownable {
         uint256 tAmount,
         bool pay_tax
     ) private {
-        //转出者减少余额
         _balances[sender] = _balances[sender] - tAmount;
 
         if(pay_tax){
-            // 买入
             if(sender == mainPair){
                 uint256 buyfee;
                 buyfee = tAmount * 3 / 100;
@@ -295,7 +293,6 @@ abstract contract AbsToken is IERC20, Ownable {
             }
         }
 
-        //接收者增加余额
         _takeTransfer(sender, recipient, tAmount);
     }
 

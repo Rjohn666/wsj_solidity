@@ -1,10 +1,4 @@
-/**
- *Submitted for verification at Etherscan.io on 2022-09-09
- */
 
-// File: MiniSolidity/33_Airdrop/IERC20.sol
-
-// WTF Solidity by 0xAA
 
 pragma solidity ^0.8.4;
 
@@ -158,7 +152,7 @@ contract ERC20 is IERC20 {
     // @dev 实现`transfer`函数，代币转账逻辑
     function transfer(
         address recipient,
-        uint mount
+        uint amount
     ) external override returns (bool) {
         balanceOf[msg.sender] -= amount;
         balanceOf[recipient] += amount;

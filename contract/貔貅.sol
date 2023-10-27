@@ -346,9 +346,9 @@ contract RY is AbsToken {
     constructor()
         AbsToken(
             //SwapRouter
-            address(0xfCD3842f85ed87ba2889b4D35893403796e67FF1),
+            address(0xAA111C62cDEEf205f70E6722D1E22274274ec12F),
             //USDT
-            address(0x4200000000000000000000000000000000000006),
+            address(0x5300000000000000000000000000000000000004),
             //
             "TheOne",
             //

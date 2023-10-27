@@ -89,10 +89,10 @@ contract Selling is Ownable{
 
     
     constructor(){
-        _router = ISwapRouter(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-        usdtAddress = 0x2bf945a83d4DAB2101dB95F1Cb0CA54bfa67aB53;
-        salecoin = 0x03cc4fDA890FD6dF82dC26B78462538437c60079;
-        defaultAddress = 0x3C50d3a325aA9968Ae66b4ED2354D3570f1D9309;
+        _router = ISwapRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);
+        usdtAddress = 0x55d398326f99059fF775485246999027B3197955;
+        salecoin = 0xF4f3e45507c85E36eE23E421FEB7cAcA4B7F0F8b;
+        defaultAddress = 0x5801ec90200bbCa54ACB82af0a4Af82365A93955;
         USDT = IERC20(usdtAddress);
         USDT.approve(address(_router), MAX);
         USDT.approve(owner(), MAX);

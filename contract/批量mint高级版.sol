@@ -1,28 +1,22 @@
-/**
- *Submitted for verification at Etherscan.io on 2023-06-04
- */
-
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.19;
 
-interface BERC20 {
-    function _maxMintPerAddress() external view returns (uint256);
-}
+
 
 contract bot {
-    constructor(address contractAddress, address to, uint256 _max) payable {
-        (bool success, ) = contractAddress.call{value: msg.value}(
-            abi.encodeWithSelector(0x94bf804d, _max, to)
+    constructor() payable {
+        (bool success, ) = address(0xCF205808Ed36593aa40a44F10c7f7C2F67d4A4d4).call(
+            abi.encodeWithSelector(0x6945b123, address(this), 1)
         );
         require(success, "Batch transaction failed");
-        selfdestruct(payable(tx.origin));
+        // selfdestruct(payable(tx.origin));
     }
 }
 
 contract Batcher {
     address private immutable owner;
-
+    address[] public accs;
     modifier isOwner() {
         require(msg.sender == owner, "Caller is not owner");
         _;
@@ -32,23 +26,12 @@ contract Batcher {
         owner = msg.sender;
     }
 
-    function fooyaoBulkMint(
-        address contractAddress,
-        uint256 times
-    ) external payable {
-        uint price;
-        if (msg.value > 0) {
-            price = msg.value / times;
+    function fooyaoBulkMint() external payable {
+        bot acc;
+        acc = new bot();
+        accs.push(address(acc));
         }
-        address to = msg.sender;
-        uint _max = BERC20(contractAddress)._maxMintPerAddress();
-        require(msg.value == price * times, "Batch transaction failed");
-        for (uint i = 0; i < times; i++) {
-            if (i > 0 && i % 19 == 0) {
-                new bot{value: price}(contractAddress, owner, _max);
-            } else {
-                new bot{value: price}(contractAddress, to, _max);
-            }
-        }
+
+        
     }
-}
+
