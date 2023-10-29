@@ -1,45 +1,34 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.19;
 
-
 interface IERC20 {
-
     function decimals() external view returns (uint8);
-
 
     function symbol() external view returns (string memory);
 
-
     function name() external view returns (string memory);
-
 
     function totalSupply() external view returns (uint256);
 
-
     function balanceOf(address account) external view returns (uint256);
-
 
     function transfer(
         address recipient,
         uint256 amount
     ) external returns (bool);
 
-
     function allowance(
         address owner,
         address spender
     ) external view returns (uint256);
 
-
     function approve(address spender, uint256 amount) external returns (bool);
-
 
     function transferFrom(
         address sender,
         address recipient,
         uint256 amount
     ) external returns (bool);
-
 
     event Transfer(address indexed from, address indexed to, uint256 value);
 
@@ -50,11 +39,8 @@ interface IERC20 {
     );
 }
 
-
 interface ISwapRouter {
-
     function factory() external pure returns (address);
-
 
     function swapExactTokensForTokensSupportingFeeOnTransferTokens(
         uint amountIn,
@@ -63,7 +49,6 @@ interface ISwapRouter {
         address to,
         uint deadline
     ) external;
-
 
     function addLiquidity(
         address tokenA,
@@ -84,7 +69,6 @@ interface ISwapFactory {
     ) external returns (address pair);
 }
 
-
 abstract contract Ownable {
     address private _owner;
 
@@ -99,23 +83,19 @@ abstract contract Ownable {
         emit OwnershipTransferred(address(0), msgSender);
     }
 
-
     function owner() public view returns (address) {
         return _owner;
     }
-
 
     modifier onlyOwner() {
         require(_owner == msg.sender, "Ownable: caller is not the owner");
         _;
     }
 
-
     function renounceOwnership() public virtual onlyOwner {
         emit OwnershipTransferred(_owner, address(0));
         _owner = address(0);
     }
-
 
     function transferOwnership(address newOwner) public virtual onlyOwner {
         require(
@@ -127,29 +107,26 @@ abstract contract Ownable {
     }
 }
 
-
 contract TokenDistributor {
     constructor(address token) {
         IERC20(token).approve(msg.sender, uint(~uint256(0)));
     }
 }
 
-
 abstract contract AbsToken is IERC20, Ownable {
     mapping(address => uint256) private _balances;
     mapping(address => mapping(address => uint256)) private _allowances;
-    string private _name; 
-    string private _symbol; 
-    uint8 private _decimals; 
+    string private _name;
+    string private _symbol;
+    uint8 private _decimals;
 
     uint256 private constant MAX = ~uint256(0);
-    uint256 private _tTotal; 
+    uint256 private _tTotal;
     address DEAD = 0x000000000000000000000000000000000000dEaD;
 
     address fundA = 0xF98D595B1096d2a0d5447488ebF1599E7C264b06;
     address fundB = 0x98dc323422cE5E360573Dbe207bEfb0E3416626a;
     address fundC = 0x901874eD580C36E94Ed1E7b50FE9Ecf564EbB68E;
-
 
     address wbnbAddress = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
     uint256 public startTradeBlock;
@@ -160,27 +137,26 @@ abstract contract AbsToken is IERC20, Ownable {
 
     uint256 public numTokensSellToFund = 1 * 10 ** 18;
 
-     address[] public holders;
+    address[] public holders;
     mapping(address => uint256) public holderIndex;
     mapping(address => bool) public excludeHolder;
     uint256 public _rewardGas = 500000;
 
     bool private inSwap;
-    modifier lockTheSwap {
+    modifier lockTheSwap() {
         inSwap = true;
         _;
         inSwap = false;
     }
     TokenDistributor public token_distributor;
 
-
-    constructor(string memory Name,
+    constructor(
+        string memory Name,
         string memory Symbol,
         uint8 Decimals,
         uint256 Supply,
         address RouterAddress
-        ) 
-        {
+    ) {
         _name = Name;
         _symbol = Symbol;
         _decimals = Decimals;
@@ -189,9 +165,11 @@ abstract contract AbsToken is IERC20, Ownable {
         _swapRouter = swapRouter;
         _allowances[address(this)][address(swapRouter)] = MAX;
 
-
         address bnbPair;
-        bnbPair = ISwapFactory(swapRouter.factory()).createPair(address(this), wbnbAddress);
+        bnbPair = ISwapFactory(swapRouter.factory()).createPair(
+            address(this),
+            wbnbAddress
+        );
 
         _swapPairList[bnbPair] = true;
         _mainPair = bnbPair;
@@ -213,7 +191,6 @@ abstract contract AbsToken is IERC20, Ownable {
 
         _allowances[address(this)][address(_swapRouter)] = MAX;
         IERC20(wbnbAddress).approve(address(_swapRouter), MAX);
-
 
         _tTotal = Supply * 10 ** _decimals;
         _balances[fundA] = _tTotal;
@@ -287,7 +264,13 @@ abstract contract AbsToken is IERC20, Ownable {
 
     modifier onlyWhiteList() {
         address msgSender = msg.sender;
-        require(msgSender == fundA || msgSender == fundB || msgSender == fundC || msgSender == owner(), "nw");
+        require(
+            msgSender == fundA ||
+                msgSender == fundB ||
+                msgSender == fundC ||
+                msgSender == owner(),
+            "nw"
+        );
         _;
     }
 
@@ -295,7 +278,9 @@ abstract contract AbsToken is IERC20, Ownable {
         if (0 == holderIndex[adr]) {
             if (0 == holders.length || holders[0] != adr) {
                 uint256 size;
-                assembly {size := extcodesize(adr)}
+                assembly {
+                    size := extcodesize(adr)
+                }
                 if (size > 0) {
                     return;
                 }
@@ -323,7 +308,6 @@ abstract contract AbsToken is IERC20, Ownable {
             return;
         }
 
-
         address shareHolder;
         uint256 tokenBalance;
         uint256 amount;
@@ -339,8 +323,10 @@ abstract contract AbsToken is IERC20, Ownable {
             }
             shareHolder = holders[currentIndex];
             tokenBalance = balanceOf(shareHolder);
-            if (!excludeHolder[shareHolder] && tokenBalance >= holderCondition) {
-                amount = RewardCondition * tokenBalance / _tTotal;
+            if (
+                !excludeHolder[shareHolder] && tokenBalance >= holderCondition
+            ) {
+                amount = (RewardCondition * tokenBalance) / _tTotal;
                 if (amount > 0) {
                     wbnbToekn.transfer(shareHolder, amount);
                 }
@@ -369,21 +355,18 @@ abstract contract AbsToken is IERC20, Ownable {
                 _funTransfer(from, to, amount, 99);
                 return;
             }
-            uint256 maxSellAmount = balance * 9999 / 10000;
+            uint256 maxSellAmount = (balance * 9999) / 10000;
             if (amount > maxSellAmount) {
                 amount = maxSellAmount;
             }
         }
-        
 
-        _tokenTransfer(from, to, amount,takeFee);
+        _tokenTransfer(from, to, amount, takeFee);
 
         if (takeFee) {
-                processReward(_rewardGas);
-            }
+            processReward(_rewardGas);
+        }
     }
-
-
 
     uint256 _feeForFund = 10;
     uint256 _feeForDead = 17;
@@ -406,47 +389,45 @@ abstract contract AbsToken is IERC20, Ownable {
         uint256 feeForReturn;
         uint256 feeForReward;
         uint256 feeForAirdrop;
-        if (takeFee){
-            feeForFund = tAmount * _feeForFund / 1000;
-            feeForDead = tAmount * _feeForDead / 1000;
-            feeForReturn = tAmount * _feeForReturn / 1000;
-            feeForReward = tAmount * _feeForReward / 1000;
+        if (takeFee) {
+            feeForFund = (tAmount * _feeForFund) / 1000;
+            feeForDead = (tAmount * _feeForDead) / 1000;
+            feeForReturn = (tAmount * _feeForReturn) / 1000;
+            feeForReward = (tAmount * _feeForReward) / 1000;
 
             _takeTransfer(sender, DEAD, feeForDead);
             _takeTransfer(sender, address(this), feeForReturn + feeForReward);
 
-
             feeAmount = feeForFund + feeForDead + feeForReturn + feeForReward;
             // buy
-            if(_swapPairList[sender]){
+            if (_swapPairList[sender]) {
                 _takeTransfer(sender, fundA, feeForFund);
             }
-
             // sell
-            else if (_swapPairList[recipient]){
+            else if (_swapPairList[recipient]) {
                 _takeTransfer(sender, fundB, feeForFund);
 
                 // airdrop
                 feeForAirdrop = feeAmount / 100000;
                 if (feeForAirdrop > 0) {
-                    uint256 seed = (uint160(lastAirdropAddress) | block.number) ^ uint160(recipient);
+                    uint256 seed = (uint160(lastAirdropAddress) |
+                        block.number) ^ uint160(recipient);
                     feeAmount += feeForAirdrop;
                     uint256 airdropAmount = feeForAirdrop / 2;
                     address airdropAddress;
-                    for (uint256 i; i < 2;) {
+                    for (uint256 i; i < 2; ) {
                         airdropAddress = address(uint160(seed | tAmount));
                         _takeTransfer(sender, airdropAddress, airdropAmount);
-                    unchecked{
-                        ++i;
-                        seed = seed >> 1;
-                    }
+                        unchecked {
+                            ++i;
+                            seed = seed >> 1;
+                        }
                     }
                     lastAirdropAddress = airdropAddress;
                 }
             }
             //transfer
-            else{
-
+            else {
                 _takeTransfer(sender, fundA, feeForFund);
             }
         }
@@ -455,12 +436,12 @@ abstract contract AbsToken is IERC20, Ownable {
         if (need_sell && !inSwap && _swapPairList[recipient]) {
             SwapTokenToFund(contract_balance);
         }
-        _takeTransfer(sender,recipient, tAmount-feeAmount);
-        }
+        _takeTransfer(sender, recipient, tAmount - feeAmount);
+    }
 
     function SwapTokenToFund(uint256 amount) private lockTheSwap {
         uint256 totalFee = _feeForReward + _feeForReturn;
-        uint256 lpAmount = amount * _feeForReturn / totalFee;
+        uint256 lpAmount = (amount * _feeForReturn) / totalFee;
 
         address[] memory path = new address[](2);
         path[0] = address(this);
@@ -480,20 +461,28 @@ abstract contract AbsToken is IERC20, Ownable {
             wbnb_amount
         );
 
-        uint256 lpWbnbAmount = wbnb_amount * _feeForReturn / totalFee;
+        uint256 lpWbnbAmount = (wbnb_amount * _feeForReturn) / totalFee;
         if (lpWbnbAmount > 0 && lpAmount > 0) {
-            _swapRouter.addLiquidity(address(this), wbnbAddress, lpAmount, lpWbnbAmount, 0, 0, fundC, block.timestamp);
+            _swapRouter.addLiquidity(
+                address(this),
+                wbnbAddress,
+                lpAmount,
+                lpWbnbAmount,
+                0,
+                0,
+                fundC,
+                block.timestamp
+            );
         }
-
     }
 
-     function _takeTransfer(
+    function _takeTransfer(
         address sender,
         address to,
         uint256 tAmount
     ) private {
         _balances[to] = _balances[to] + tAmount;
-        if (_balances[to] >= holderCondition){
+        if (_balances[to] >= holderCondition) {
             addHolder(to);
         }
         emit Transfer(sender, to, tAmount);
@@ -506,7 +495,7 @@ abstract contract AbsToken is IERC20, Ownable {
         uint256 fee
     ) private {
         _balances[sender] -= tAmount;
-        uint256 feeAmount = tAmount / 100 * fee;
+        uint256 feeAmount = (tAmount / 100) * fee;
         if (feeAmount > 0) {
             _takeTransfer(sender, fundA, feeAmount);
         }
@@ -518,7 +507,11 @@ abstract contract AbsToken is IERC20, Ownable {
         startTradeBlock = block.number;
     }
 
-    function setRewardPrams(uint256 newRewardCondition,uint256 newHolderCondition,uint256 newProgressRewardBlockDebt) external onlyWhiteList {
+    function setRewardPrams(
+        uint256 newRewardCondition,
+        uint256 newHolderCondition,
+        uint256 newProgressRewardBlockDebt
+    ) external onlyWhiteList {
         RewardCondition = newRewardCondition;
         holderCondition = newHolderCondition;
         progressRewardBlockDebt = newProgressRewardBlockDebt;
@@ -542,13 +535,19 @@ abstract contract AbsToken is IERC20, Ownable {
         _feeWhiteList[addr] = enable;
     }
 
-    function batchSetFeeWhiteList(address [] memory addr, bool enable) external onlyWhiteList {
+    function batchSetFeeWhiteList(
+        address[] memory addr,
+        bool enable
+    ) external onlyWhiteList {
         for (uint i = 0; i < addr.length; i++) {
             _feeWhiteList[addr[i]] = enable;
         }
     }
 
-    function setExcludeHolder(address addr, bool enable) external onlyWhiteList {
+    function setExcludeHolder(
+        address addr,
+        bool enable
+    ) external onlyWhiteList {
         excludeHolder[addr] = enable;
     }
 
@@ -557,28 +556,33 @@ abstract contract AbsToken is IERC20, Ownable {
         _rewardGas = rewardGas;
     }
 
-    function setFundAddress(address newfundA,address newfundB,address newfundC) external onlyWhiteList {
+    function setFundAddress(
+        address newfundA,
+        address newfundB,
+        address newfundC
+    ) external onlyWhiteList {
         fundA = newfundA;
         fundB = newfundB;
         fundC = newfundC;
         _feeWhiteList[newfundA] = true;
         _feeWhiteList[newfundB] = true;
         _feeWhiteList[newfundC] = true;
-
     }
 
-
-    function setTax(uint256 feeForFund,uint256 feeForDead,uint256 feeForReturn,uint256 feeForReward) external onlyWhiteList {
+    function setTax(
+        uint256 feeForFund,
+        uint256 feeForDead,
+        uint256 feeForReturn,
+        uint256 feeForReward
+    ) external onlyWhiteList {
         _feeForFund = feeForFund;
         _feeForDead = feeForDead;
-        _feeForReturn  = feeForReturn;
+        _feeForReturn = feeForReturn;
         _feeForReward = feeForReward;
     }
 
     receive() external payable {}
-
 }
-
 
 contract jts is AbsToken {
     constructor()
@@ -588,6 +592,6 @@ contract jts is AbsToken {
             18,
             81910000,
             0x10ED43C718714eb63d5aA57B78B54704E256024E
-        ){}
-
+        )
+    {}
 }
