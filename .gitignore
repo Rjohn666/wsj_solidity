@@ -6,3 +6,5 @@ artifacts
 /bin
 /package-lock.json
 /package.json
+artifacts
+build-info

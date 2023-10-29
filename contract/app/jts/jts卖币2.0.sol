@@ -125,16 +125,16 @@ contract Selling is Ownable {
     ISwapRouter private _router;
     IERC20 USDT;
 
-    bool public status = true;
+    bool public status;
     IoldSell _oldsell;
 
     constructor() {
-        _router = ISwapRouter(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-        usdtAddress = 0x2bf945a83d4DAB2101dB95F1Cb0CA54bfa67aB53; //usdr
-        wbnbAddress = 0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6;
-        salecoin = 0x1b2385c198f90d9347a2f453F104C59647dfae90; // jts地址
-        defaultAddress = 0xe619719bd3baa7460434A64173758E41035AAF0C;
-        oldAddress = 0xf8e81D47203A594245E36C48e151709F0C19fBe8;
+        _router = ISwapRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);
+        usdtAddress = 0x55d398326f99059fF775485246999027B3197955;
+        wbnbAddress = 0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c;
+        salecoin = 0x299ECC384ded931a8F611B215dbfd370B5E1CCf3;
+        defaultAddress = 0x5801ec90200bbCa54ACB82af0a4Af82365A93955;
+        oldAddress = 0x381C59C2d4e9dF4D0D4D620D79F81D3b97D96767;
         _oldsell = IoldSell(oldAddress);
 
         USDT = IERC20(usdtAddress);
