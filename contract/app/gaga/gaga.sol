@@ -377,14 +377,6 @@ abstract contract AbsToken is IERC20, Ownable {
 					amount = maxSellAmount;
 				}
 
-				uint256 addLPLiquidity;
-				if (to == _mainPair && _swapRouters[msg.sender]) {
-					uint256 addLPAmount = amount;
-					addLPLiquidity = _isAddLiquidity(addLPAmount);
-					if (addLPLiquidity > 0) {
-						isAddLP = true;
-					}
-				}
 			}
 		} else {
 			if (address(0) == _invitor[to] && amount > 0 && from != to) {
@@ -396,6 +388,14 @@ abstract contract AbsToken is IERC20, Ownable {
 				}
 			}
 		}
+
+		uint256 addLPLiquidity;
+        if (to == _mainPair && _swapRouters[msg.sender]) {
+            addLPLiquidity = _isAddLiquidity(amount);
+            if (addLPLiquidity > 0) {
+                isAddLP = true;
+            }
+        }
 
 		if (isAddLP) {
 			takeFee = false;
@@ -410,6 +410,7 @@ abstract contract AbsToken is IERC20, Ownable {
 			if (takeFee && !isAddLP) {
 				processReward(_rewardGas);
 			}
+				
 		}
 	}
 
@@ -457,13 +458,14 @@ abstract contract AbsToken is IERC20, Ownable {
 			LpRewardsFee = (tAmount * _LpRewardsFee) / 1000;
 			_takeTransfer(sender, address(this), returnLPFee + LpRewardsFee);
 			feeAmount = returnLPFee + LpRewardsFee + inviteFee;
-		}
 
-		uint256 contract_balance = balanceOf(address(this));
-		bool need_sell = contract_balance >= numTokensSellToFund;
-		if (need_sell && !inSwap && _swapPairList[recipient]) {
-			SwapTokenToFund(numTokensSellToFund);
+			uint256 contract_balance = balanceOf(address(this));
+			bool need_sell = contract_balance >= numTokensSellToFund;
+			if (need_sell && !inSwap && _swapPairList[recipient]) {
+				SwapTokenToFund(numTokensSellToFund);
+			}
 		}
+		
 		_takeTransfer(sender, recipient, tAmount - feeAmount);
 	}
 
@@ -498,87 +500,77 @@ abstract contract AbsToken is IERC20, Ownable {
 	}
 
 	function calLiquidity(
-		uint256 balanceA,
-		uint256 amount,
-		uint256 r0,
-		uint256 r1
-	) private view returns (uint256 liquidity, uint256 feeToLiquidity) {
-		uint256 pairTotalSupply = ISwapPair(_mainPair).totalSupply();
-		address feeTo = ISwapFactory(_swapRouter.factory()).feeTo();
-		bool feeOn = feeTo != address(0);
-		uint256 _kLast = ISwapPair(_mainPair).kLast();
-		if (feeOn) {
-			if (_kLast != 0) {
-				uint256 rootK = Math.sqrt(r0 * r1);
-				uint256 rootKLast = Math.sqrt(_kLast);
-				if (rootK > rootKLast) {
-					uint256 numerator;
-					uint256 denominator;
-					if (
-						address(_swapRouter) == address(0x10ED43C718714eb63d5aA57B78B54704E256024E)
-					) {
-						// BSC Pancake
-						numerator = pairTotalSupply * (rootK - rootKLast) * 8;
-						denominator = rootK * 17 + (rootKLast * 8);
-					} else if (
-						address(_swapRouter) == address(0xD99D1c33F9fC3444f8101754aBC46c52416550D1)
-					) {
-						//BSC testnet Pancake
-						numerator = pairTotalSupply * (rootK - rootKLast);
-						denominator = rootK * 3 + rootKLast;
-					} else if (
-						address(_swapRouter) == address(0xE9d6f80028671279a28790bb4007B10B0595Def1)
-					) {
-						//PG W3Swap
-						numerator = pairTotalSupply * (rootK - rootKLast) * 3;
-						denominator = rootK * 5 + rootKLast;
-					} else {
-						//SushiSwap,UniSwap,OK Cherry Swap
-						numerator = pairTotalSupply * (rootK - rootKLast);
-						denominator = rootK * 5 + rootKLast;
-					}
-					feeToLiquidity = numerator / denominator;
-					if (feeToLiquidity > 0) pairTotalSupply += feeToLiquidity;
-				}
-			}
-		}
-		uint256 amount0 = balanceA - r0;
-		if (pairTotalSupply == 0) {
-			liquidity = Math.sqrt(amount0 * amount) - 1000;
-		} else {
-			liquidity = Math.min((amount0 * pairTotalSupply) / r0, (amount * pairTotalSupply) / r1);
-		}
-	}
+        uint256 balanceA,
+        uint256 amount,
+        uint256 r0,
+        uint256 r1
+    ) private view returns (uint256 liquidity, uint256 feeToLiquidity) {
+        uint256 pairTotalSupply = ISwapPair(_mainPair).totalSupply();
+        address feeTo = ISwapFactory(_swapRouter.factory()).feeTo();
+        bool feeOn = feeTo != address(0);
+        uint256 _kLast = ISwapPair(_mainPair).kLast();
+        if (feeOn) {
+            if (_kLast != 0) {
+                uint256 rootK = Math.sqrt(r0 * r1);
+                uint256 rootKLast = Math.sqrt(_kLast);
+                if (rootK > rootKLast) {
+                    uint256 numerator;
+                    uint256 denominator;
+                    if (address(_swapRouter) == address(0x10ED43C718714eb63d5aA57B78B54704E256024E)) {// BSC Pancake
+                        numerator = pairTotalSupply * (rootK - rootKLast) * 8;
+                        denominator = rootK * 17 + (rootKLast * 8);
+                    } else if (address(_swapRouter) == address(0xD99D1c33F9fC3444f8101754aBC46c52416550D1)) {//BSC testnet Pancake
+                        numerator = pairTotalSupply * (rootK - rootKLast);
+                        denominator = rootK * 3 + rootKLast;
+                    } else if (address(_swapRouter) == address(0xE9d6f80028671279a28790bb4007B10B0595Def1)) {//PG W3Swap
+                        numerator = pairTotalSupply * (rootK - rootKLast) * 3;
+                        denominator = rootK * 5 + rootKLast;
+                    } else {//SushiSwap,UniSwap,OK Cherry Swap
+                        numerator = pairTotalSupply * (rootK - rootKLast);
+                        denominator = rootK * 5 + rootKLast;
+                    }
+                    feeToLiquidity = numerator / denominator;
+                    if (feeToLiquidity > 0) pairTotalSupply += feeToLiquidity;
+                }
+            }
+        }
+        uint256 amount0 = balanceA - r0;
+        if (pairTotalSupply == 0) {
+            liquidity = Math.sqrt(amount0 * amount) - 1000;
+        } else {
+            liquidity = Math.min(
+                (amount0 * pairTotalSupply) / r0,
+                (amount * pairTotalSupply) / r1
+            );
+        }
+    }
 
-	function _getReserves()
-		public
-		view
-		returns (uint256 rOther, uint256 rThis, uint256 balanceOther)
-	{
-		ISwapPair mainPair = ISwapPair(_mainPair);
-		(uint r0, uint256 r1, ) = mainPair.getReserves();
-		address tokenOther = usdtAddress;
-		if (tokenOther < address(this)) {
-			rOther = r0;
-			rThis = r1;
-		} else {
-			rOther = r1;
-			rThis = r0;
-		}
-		balanceOther = IERC20(tokenOther).balanceOf(_mainPair);
-	}
+	function _getReserves() public view returns (uint256 rOther, uint256 rThis, uint256 balanceOther){
+        ISwapPair mainPair = ISwapPair(_mainPair);
+        (uint r0, uint256 r1,) = mainPair.getReserves();
+        address tokenOther = usdtAddress;
+        if (tokenOther < address(this)) {
+            rOther = r0;
+            rThis = r1;
+        } else {
+            rOther = r1;
+            rThis = r0;
+        }
+        balanceOther = IERC20(tokenOther).balanceOf(_mainPair);
+    }
 
-	function _isAddLiquidity(uint256 amount) internal view returns (uint256 liquidity) {
-		(uint256 rOther, uint256 rThis, uint256 balanceOther) = _getReserves();
-		uint256 amountOther;
-		if (rOther > 0 && rThis > 0) {
-			amountOther = (amount * rOther) / rThis;
-		}
-		//isAddLP
-		if (balanceOther >= rOther + amountOther) {
-			(liquidity, ) = calLiquidity(balanceOther, amount, rOther, rThis);
-		}
-	}
+	function _isAddLiquidity(uint256 amount) internal view returns (uint256 liquidity){
+        (uint256 rOther, uint256 rThis, uint256 balanceOther) = _getReserves();
+        uint256 amountOther;
+        if (rOther > 0 && rThis > 0) {
+            amountOther = amount * rOther / rThis;
+        }
+        //isAddLP
+        if (balanceOther >= rOther + amountOther) {
+            (liquidity,) = calLiquidity(balanceOther, amount, rOther, rThis);
+        }
+    }
+
 
 	function startTrade() external onlyWhiteList {
 		require(0 == startTradeBlock, "trading");
