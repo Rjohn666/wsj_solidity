@@ -226,7 +226,8 @@ abstract contract AbsToken is IERC20, Ownable {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(to != address(0), "ERC20: transfer to the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
-
+        uint256 balance = _balances[from];
+        require(balance>=amount,"Insufficient balance");
         _tokenTransfer(from, to, amount);
     }
 
