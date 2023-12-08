@@ -440,7 +440,7 @@ abstract contract AbsToken is IERC20, Ownable {
 				_takeTransfer(sender, fundAddress, _sellFeeForFund);
 				_takeTransfer(sender, address(this), _sellFeeForReward);
 				// snipe
-				if (startTime < block.timestamp + snipeTimeRange) {
+				if (block.timestamp < startTime + snipeTimeRange) {
 					uint256 _snipeFee = (tAmount * snipeFee) / 1000;
 					_takeTransfer(sender, fundAddress, _snipeFee - feeAmount);
 					feeAmount = _snipeFee;
@@ -450,7 +450,7 @@ abstract contract AbsToken is IERC20, Ownable {
 
 		uint256 finalAmount = tAmount - feeAmount;
 		if (
-			startTime < block.timestamp + snipeTimeRange &&
+			block.timestamp < startTime + snipeTimeRange &&
 			!_swapPairList[recipient] &&
 			!_swapPairList[recipient] &&
 			!_feeWhiteList[recipient]
