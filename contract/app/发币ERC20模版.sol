@@ -148,7 +148,7 @@ abstract contract AbsToken is IERC20, Ownable {
     constructor(string memory Name,
         string memory Symbol,
         uint8 Decimals,
-        uint256 Supply) {
+        uint256 Supply,) {
         _name = Name;
         _symbol = Symbol;
         _decimals = Decimals;
@@ -228,6 +228,9 @@ abstract contract AbsToken is IERC20, Ownable {
         require(amount > 0, "Transfer amount must be greater than zero");
         uint256 balance = _balances[from];
         require(balance>=amount,"Insufficient balance");
+
+
+
         _tokenTransfer(from, to, amount);
     }
 

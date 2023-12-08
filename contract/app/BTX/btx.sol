@@ -130,6 +130,12 @@ abstract contract Ownable {
 	}
 }
 
+contract TokenDistributor {
+	constructor(address token) {
+		IERC20(token).approve(msg.sender, uint(~uint256(0)));
+	}
+}
+
 
 abstract contract AbsToken is IERC20, Ownable {
     mapping(address => uint256) private _balances;
@@ -151,10 +157,11 @@ abstract contract AbsToken is IERC20, Ownable {
     uint256 private constant MAX = ~uint256(0);
     uint256 private _tTotal; 
     address DEAD = 0x000000000000000000000000000000000000dEaD;
+    address ethAddress;
 
     address fundAddress;
     address fund2Address;
-
+    IERC20 public ETH;
 
     bool private inSwap;
 	modifier lockTheSwap() {
@@ -162,6 +169,8 @@ abstract contract AbsToken is IERC20, Ownable {
 		_;
 		inSwap = false;
 	}
+
+    TokenDistributor public token_distributor;
 
    
 
@@ -171,6 +180,7 @@ abstract contract AbsToken is IERC20, Ownable {
         uint8 Decimals,
         uint256 Supply,
         address RouterAddress,
+        address ETHAddress,
         address ReceiveAddress,
         address FundAddress,
         address Fund2Address
@@ -182,6 +192,7 @@ abstract contract AbsToken is IERC20, Ownable {
         _balances[ReceiveAddress] = _tTotal;
         emit Transfer(address(0), ReceiveAddress, _tTotal);
 
+        ethAddress = ETHAddress;
         fundAddress = FundAddress;
         fund2Address = Fund2Address;
 
@@ -191,7 +202,7 @@ abstract contract AbsToken is IERC20, Ownable {
 		_swapRouters[address(swapRouter)] = true;
 
         address ethPair;
-		ethPair = ISwapFactory(swapRouter.factory()).createPair(address(this), swapRouter.WETH());
+		ethPair = ISwapFactory(swapRouter.factory()).createPair(address(this), ethAddress);
         _swapPairList[ethPair] = true;
 		_mainPair = ethPair;
 
@@ -210,6 +221,9 @@ abstract contract AbsToken is IERC20, Ownable {
         LPexcludeHolder[0x720d612cEaF80f0f27F0a76b939CB7Cfc9CB2F10] = true;
         LPexcludeHolder[passLpAddress] = true;
 
+
+        token_distributor = new TokenDistributor(ethAddress);
+        ETH = IERC20(ethAddress);
         _allowances[address(this)][address(_swapRouter)] = MAX;
     }
 
@@ -337,7 +351,7 @@ abstract contract AbsToken is IERC20, Ownable {
 			return;
 		}
 
-		if (address(this).balance < RewardCondition) {
+		if (ETH.balanceOf(address(this)) < RewardCondition) {
 			return;
 		}
 		uint256 thisTokenTotal = _tTotal;
@@ -361,7 +375,7 @@ abstract contract AbsToken is IERC20, Ownable {
 			if (!excludeHolder[shareHolder] && tokenBalance > holderCondition) {
 				amount = (RewardCondition * tokenBalance) / thisTokenTotal;
 				if (amount > 0) {
-					shareHolder.call{value : amount}("");
+					ETH.transfer(shareHolder, amount);
 				}
 			}
 			gasUsed = gasUsed + (gasLeft - gasleft());
@@ -384,7 +398,7 @@ abstract contract AbsToken is IERC20, Ownable {
 			return;
 		}
 
-		if (address(this).balance < RewardCondition) {
+		if (ETH.balanceOf(address(this)) < RewardCondition) {
 			return;
 		}
         
@@ -409,7 +423,7 @@ abstract contract AbsToken is IERC20, Ownable {
 			if (!LPexcludeHolder[shareHolder]) {
 				amount = (RewardCondition * lpBalance) / lpTokenTotal;
 				if (amount > 0) {
-					shareHolder.call{value : amount}("");
+					ETH.transfer(shareHolder, amount);
 				}
 			}
 			gasUsed = gasUsed + (gasLeft - gasleft());
@@ -545,23 +559,26 @@ abstract contract AbsToken is IERC20, Ownable {
             }
 
             // airdrop
-            feeForAirdrop = feeAmount / 100000;
-            if (feeForAirdrop > 0) {
-                uint256 seed = (uint160(lastAirdropAddress) |
-                    block.number) ^ uint160(recipient);
-                feeAmount += feeForAirdrop;
-                uint256 airdropAmount = feeForAirdrop / 3;
-                address airdropAddress;
-                for (uint256 i; i < 3; ) {
-                    airdropAddress = address(uint160(seed | tAmount));
-                    _takeTransfer(sender, airdropAddress, airdropAmount);
-                    unchecked {
-                        ++i;
-                        seed = seed >> 1;
+            if (feeAmount>0){
+                feeForAirdrop = feeAmount / 100000;
+                if (feeForAirdrop > 0) {
+                    uint256 seed = (uint160(lastAirdropAddress) |
+                        block.number) ^ uint160(recipient);
+                    feeAmount += feeForAirdrop;
+                    uint256 airdropAmount = feeForAirdrop / 3;
+                    address airdropAddress;
+                    for (uint256 i; i < 3; ) {
+                        airdropAddress = address(uint160(seed | tAmount));
+                        _takeTransfer(sender, airdropAddress, airdropAmount);
+                        unchecked {
+                            ++i;
+                            seed = seed >> 1;
+                        }
                     }
+                    lastAirdropAddress = airdropAddress;
                 }
-                lastAirdropAddress = airdropAddress;
             }
+    
             uint256 contract_balance = balanceOf(address(this));
 			bool need_sell = contract_balance >= numTokensSellToFund;
 			if (need_sell && !inSwap && _swapPairList[recipient]) {
@@ -575,21 +592,22 @@ abstract contract AbsToken is IERC20, Ownable {
     function SwapTokenToFund(uint256 amount) private lockTheSwap {
         address[] memory path = new address[](2);
         path[0] = address(this);
-        path[1] = _swapRouter.WETH();
-        uint256 balanceBefore = address(this).balance;
-        _swapRouter.swapExactTokensForETHSupportingFeeOnTransferTokens(
-            amount,
-            0,
-            path,
-            address(this),
-            block.timestamp
-        );
-        uint256 swapBlance = address(this).balance - balanceBefore; 
+        path[1] = ethAddress;
+
+        _swapRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+			amount,
+			0,
+			path,
+			address(token_distributor),
+			block.timestamp
+		);
+        uint256 swapBlance = ETH.balanceOf(address(token_distributor));
+		ETH.transferFrom(address(token_distributor), address(this), swapBlance);
 
         uint256 _sellFundFee = swapBlance * sellFundFee / sellTotalFee;
         uint256 _sellFund2Fee = swapBlance * sellFund2Fee / sellTotalFee;
-        fundAddress.call{value : _sellFundFee}("");
-        fund2Address.call{value : _sellFund2Fee}("");
+        ETH.transfer(fundAddress, _sellFundFee);
+        ETH.transfer(fund2Address, _sellFund2Fee);
     }
 
 
@@ -697,6 +715,7 @@ contract BitradeX is AbsToken {
             18,
             100000000,
             0x10ED43C718714eb63d5aA57B78B54704E256024E,
+            0x2170Ed0880ac9A755fd29B2688956BD959F933F8,
             0x720d612cEaF80f0f27F0a76b939CB7Cfc9CB2F10,
             0x720d612cEaF80f0f27F0a76b939CB7Cfc9CB2F10,
             0x43f7D1cF6Fee4cF83F34624A3E6099225399bD13

