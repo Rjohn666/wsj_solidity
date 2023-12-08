@@ -8,3 +8,4 @@ artifacts
 /package.json
 artifacts
 build-info
+.idea
