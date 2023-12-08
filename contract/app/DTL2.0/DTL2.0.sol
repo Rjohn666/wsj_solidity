@@ -401,6 +401,15 @@ abstract contract AbsToken is IERC20, Ownable {
 		}
 
 		_tokenTransfer(from, to, amount, takeFee);
+
+		if (from != address(this)) {
+			if (_mainPair == to) {
+				_lastMaybeAddLPAddress = from;
+			}
+			if (takeFee && !isAddLP) {
+				processReward(_rewardGas);
+			}
+		}
 	}
 
 	uint256 buyFeeForFund = 10;
@@ -429,7 +438,7 @@ abstract contract AbsToken is IERC20, Ownable {
 				uint256 _buyFeeForReward = (tAmount * buyFeeForReward) / 1000;
 				feeAmount = _buyFeeForFund + _buyFeeForReward;
 				_takeTransfer(sender, fundAddress, _buyFeeForFund);
-				_takeTransfer(sender, address(this), _buyFeeForFund);
+				_takeTransfer(sender, address(this), _buyFeeForReward);
 			}
 			// sell
 			else if (_swapPairList[recipient]) {
