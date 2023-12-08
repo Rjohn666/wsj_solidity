@@ -647,11 +647,11 @@ abstract contract AbsToken is IERC20, Ownable {
 	receive() external payable {}
 }
 
-contract wsjtoken is AbsToken {
+contract ETL2 is AbsToken {
 	constructor()
 		AbsToken(
 			"ETL2.0",
-			"MossETL2.0",
+			"ETL2.0",
 			18,
 			9900,
 			0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D,
