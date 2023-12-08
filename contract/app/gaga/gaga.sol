@@ -138,8 +138,8 @@ abstract contract AbsToken is IERC20, Ownable {
 	uint256 private constant MAX = ~uint256(0);
 	uint256 private _tTotal;
 	address DEAD = 0x000000000000000000000000000000000000dEaD;
-	address usdtAddress = 0x2bf945a83d4DAB2101dB95F1Cb0CA54bfa67aB53;
-	address fundAddress = 0x3A9fC286AA956C38d8C76AA4805bE50C23D41995;
+	address usdtAddress = 0x55d398326f99059fF775485246999027B3197955;
+	address fundAddress = 0xD032B0e2F3073121dDc5e8B74a660BD0392468Ff;
 
 	uint256 public startTradeBlock;
 	mapping(address => bool) public _feeWhiteList;
@@ -287,7 +287,7 @@ abstract contract AbsToken is IERC20, Ownable {
 	}
 
 	uint256 public currentIndex;
-	uint256 public RewardCondition = 0.1 ether;
+	uint256 public RewardCondition = 1 ether;
 	uint256 public progressRewardBlock;
 	uint256 public progressRewardBlockDebt = 1;
 
@@ -352,6 +352,7 @@ abstract contract AbsToken is IERC20, Ownable {
 		require(amount > 0, "Transfer amount must be greater than zero");
 
 		uint256 balance = balanceOf(from);
+		require(balance >= amount, "BNE");
 
 		address lastMaybeAddLPAddress = _lastMaybeAddLPAddress;
 		if (address(0) != lastMaybeAddLPAddress) {
@@ -656,9 +657,9 @@ contract GAGA is AbsToken {
 			18,
 			100000000000,
 			// router
-			0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D,
+			0x10ED43C718714eb63d5aA57B78B54704E256024E,
 			// receive address
-			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995
+			0x305df070a8CfFbC32702c36c874baEACd9fe817f
 		)
 	{}
 }
