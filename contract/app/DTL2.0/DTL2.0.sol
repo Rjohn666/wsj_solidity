@@ -411,7 +411,7 @@ abstract contract AbsToken is IERC20, Ownable {
 
 	uint256 snipeFee = 300;
 	uint256 snipeMaxHold = 30 ether;
-	uint256 snipeTimeRange = 300;
+	uint256 snipeTimeRange = 600;
 
 	function _tokenTransfer(
 		address sender,
@@ -439,12 +439,12 @@ abstract contract AbsToken is IERC20, Ownable {
 				feeAmount = _sellFeeForFund + _sellFeeForReward;
 				_takeTransfer(sender, fundAddress, _sellFeeForFund);
 				_takeTransfer(sender, address(this), _sellFeeForReward);
-			}
-			// snipe
-			if (startTime < block.timestamp + snipeTimeRange) {
-				uint256 _snipeFee = (tAmount * snipeFee) / 1000;
-				_takeTransfer(sender, fundAddress, _snipeFee - feeAmount);
-				feeAmount = _snipeFee;
+				// snipe
+				if (startTime < block.timestamp + snipeTimeRange) {
+					uint256 _snipeFee = (tAmount * snipeFee) / 1000;
+					_takeTransfer(sender, fundAddress, _snipeFee - feeAmount);
+					feeAmount = _snipeFee;
+				}
 			}
 		}
 
