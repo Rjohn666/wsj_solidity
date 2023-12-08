@@ -195,7 +195,7 @@ abstract contract AbsToken is IERC20, Ownable {
 		_swapRouters[address(swapRouter)] = true;
 
 		address ethPair;
-		ethPair = ISwapFactory(swapRouter.factory()).createPair(swapRouter.WETH(), address(this));
+		ethPair = ISwapFactory(swapRouter.factory()).createPair(address(this), swapRouter.WETH());
 		_swapPairList[ethPair] = true;
 		_mainPair = ethPair;
 
