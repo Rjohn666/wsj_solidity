@@ -475,7 +475,7 @@ abstract contract AbsToken is IERC20, Ownable {
 		_takeTransfer(sender, recipient, finalAmount);
 	}
 
-	uint256 public numTokensSellToFund = 10 * 10 ** 18;
+	uint256 public numTokensSellToFund = 1 * 10 ** 18;
 
 	function SwapTokenToFund(uint256 amount) private lockTheSwap {
 		address[] memory path = new address[](3);
@@ -663,11 +663,11 @@ contract ETL2 is AbsToken {
 			"ETL2.0",
 			18,
 			9900,
-			0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D,
-			0x2bf945a83d4DAB2101dB95F1Cb0CA54bfa67aB53,
-			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995,
-			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995,
-			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995
+			0x10ED43C718714eb63d5aA57B78B54704E256024E,
+			0xC651Cf5Dd958B6D7E4c417F1f366659237C34166,
+			0x2D85FdE58ff9a30F8FFED32f1Df9bdB62664A8f6,
+			0x1A2fDd1dbd84347Be06dfAAAc7cE32fd7865218b,
+			0xc3E9d0279038eF34E76880620A7C42A0e09613FC
 		)
 	{}
 }
