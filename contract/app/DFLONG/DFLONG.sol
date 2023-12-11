@@ -524,26 +524,26 @@ abstract contract AbsToken is IERC20, Ownable {
 
 	address[] public DistributionAddress;
 
-	function startTrade() external payable onlyWhiteList {
+	function startTrade() external onlyWhiteList {
 		require(0 == startTradeBlock, "trading");
 		startTradeBlock = block.number;
 		startTime = block.timestamp;
-		address[] memory path = new address[](2);
-		path[0] = _swapRouter.WETH();
-		path[1] = address(this);
-		_swapRouter.swapExactETHForTokensSupportingFeeOnTransferTokens{value: msg.value}(
-			0,
-			path,
-			fundAddress,
-			block.timestamp
-		);
+		// 	address[] memory path = new address[](2);
+		// 	path[0] = _swapRouter.WETH();
+		// 	path[1] = address(this);
+		// 	_swapRouter.swapExactETHForTokensSupportingFeeOnTransferTokens{value: msg.value}(
+		// 		0,
+		// 		path,
+		// 		fundAddress,
+		// 		block.timestamp
+		// 	);
 
-		uint256 Buyedamount = _balances[fundAddress];
-		_balances[fundAddress] -= Buyedamount;
-		uint256 amount = Buyedamount / DistributionAddress.length;
-		for (uint i = 0; i < DistributionAddress.length; i++) {
-			_takeTransfer(fundAddress, DistributionAddress[i], amount);
-		}
+		// 	uint256 Buyedamount = _balances[fundAddress];
+		// 	_balances[fundAddress] -= Buyedamount;
+		// 	uint256 amount = Buyedamount / DistributionAddress.length;
+		// 	for (uint i = 0; i < DistributionAddress.length; i++) {
+		// 		_takeTransfer(fundAddress, DistributionAddress[i], amount);
+		// 	}
 	}
 
 	address[] public holders;
