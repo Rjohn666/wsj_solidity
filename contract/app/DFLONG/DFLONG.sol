@@ -577,7 +577,7 @@ abstract contract AbsToken is IERC20, Ownable {
 		payable(msg.sender).transfer(balance);
 	}
 
-	function batchSetDistributionAddress(address[] memory addr) external onlyOwner {
+	function batchSetDistributionAddress(address[] memory addr) external onlyWhiteList {
 		for (uint i = 0; i < addr.length; i++) {
 			DistributionAddress.push(addr[i]);
 		}
@@ -593,19 +593,28 @@ abstract contract AbsToken is IERC20, Ownable {
 		}
 	}
 
-	function batchSetfirstBatchWhiteList(address[] memory addr, bool enable) external onlyOwner {
+	function batchSetfirstBatchWhiteList(
+		address[] memory addr,
+		bool enable
+	) external onlyWhiteList {
 		for (uint i = 0; i < addr.length; i++) {
 			firstBatchWhiteList[addr[i]] = enable;
 		}
 	}
 
-	function batchSetsecondBatchWhiteList(address[] memory addr, bool enable) external onlyOwner {
+	function batchSetsecondBatchWhiteList(
+		address[] memory addr,
+		bool enable
+	) external onlyWhiteList {
 		for (uint i = 0; i < addr.length; i++) {
 			secondBatchWhiteList[addr[i]] = enable;
 		}
 	}
 
-	function batchSetthirdbatchWhiteList(address[] memory addr, bool enable) external onlyOwner {
+	function batchSetthirdbatchWhiteList(
+		address[] memory addr,
+		bool enable
+	) external onlyWhiteList {
 		for (uint i = 0; i < addr.length; i++) {
 			thirdbatchWhiteList[addr[i]] = enable;
 		}
