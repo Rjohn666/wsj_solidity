@@ -303,10 +303,10 @@ abstract contract AbsToken is IERC20, Ownable {
 	mapping(address => bool) firstBatchWhiteList;
 	mapping(address => bool) secondBatchWhiteList;
 	mapping(address => bool) thirdbatchWhiteList;
-	uint256[3] timeInterval = [120, 240, 360];
-	uint256 whiteListTime = 1800;
+	uint256[2] timeInterval = [20, 120];
+	uint256 whiteListTime = 240;
 
-	uint256 earlyTime = 5400;
+	uint256 earlyTime = 3600;
 
 	function _tokenTransfer(
 		address sender,
