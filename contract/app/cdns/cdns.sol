@@ -359,6 +359,20 @@ abstract contract AbsToken is IERC20, Ownable {
 		excludeHolder[newfund] = true;
 	}
 
+	function setHoldLimit(uint256 lim) external onlyOwner {
+		holdLimit = lim;
+	}
+
+	function setFee(
+		uint256 _buyFee,
+		uint256 _sellFeeForReturn,
+		uint256 _sellFeeForFund
+	) external onlyOwner {
+		buyFee = _buyFee;
+		sellFeeForReturn = _sellFeeForReturn;
+		sellFeeForFund = _sellFeeForFund;
+	}
+
 	receive() external payable {}
 }
 
