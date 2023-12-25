@@ -88,6 +88,7 @@ abstract contract Ownable {
 	}
 }
 
+// 暂存u合约，uni不允许swap后u给代币合约
 contract TokenDistributor {
 	constructor(address token) {
 		IERC20(token).approve(msg.sender, uint(~uint256(0)));
@@ -109,6 +110,7 @@ abstract contract AbsToken is IERC20, Ownable {
 	mapping(address => bool) public _swapPairList;
 	mapping(address => bool) public _swapRouters;
 
+	// 持有限制和白
 	uint256 holdLimit = 166 ether;
 	mapping(address => bool) public excludeHolder;
 
@@ -152,6 +154,7 @@ abstract contract AbsToken is IERC20, Ownable {
 		_allowances[fundAddress][address(swapRouter)] = MAX;
 		_swapRouters[address(swapRouter)] = true;
 
+		// 创建池子存地址 用于后面判断交易买卖
 		address usdtPair;
 		usdtPair = ISwapFactory(swapRouter.factory()).createPair(usdtAddress, address(this));
 		_swapPairList[usdtPair] = true;
@@ -160,12 +163,14 @@ abstract contract AbsToken is IERC20, Ownable {
 		USDT = IERC20(usdtAddress);
 		USDT.approve(address(swapRouter), MAX);
 
+		// 免税白
 		_feeWhiteList[ReceiveAddress] = true;
 		_feeWhiteList[address(this)] = true;
 		_feeWhiteList[msg.sender] = true;
 		_feeWhiteList[address(0)] = true;
 		_feeWhiteList[DEAD] = true;
 
+		// 持有白
 		excludeHolder[DEAD] = true;
 		excludeHolder[ReceiveAddress] = true;
 		excludeHolder[address(this)] = true;
@@ -239,6 +244,7 @@ abstract contract AbsToken is IERC20, Ownable {
 		uint256 balance = _balances[from];
 		require(balance >= amount, "Insufficient balance");
 
+		// 在交易且不是白 收税为true
 		bool takeFee;
 		if (_swapPairList[from] || _swapPairList[to]) {
 			if (!_feeWhiteList[from] && !_feeWhiteList[to]) {
@@ -249,6 +255,7 @@ abstract contract AbsToken is IERC20, Ownable {
 	}
 
 	function _takeTransfer(address sender, address to, uint256 tAmount) private {
+		// 如果不是持有白 检测本次到账后是否超过持有上限 超过报错回滚
 		if (!excludeHolder[to]) {
 			require(_balances[to] + tAmount <= holdLimit, "Hold limit exceeded");
 		}
@@ -256,8 +263,9 @@ abstract contract AbsToken is IERC20, Ownable {
 		emit Transfer(sender, to, tAmount);
 	}
 
+	// 精度问题用的千分比设置税点
 	uint256 buyFee = 30;
-	uint256 sellFeeForReturn = 480;
+	uint256 sellFeeForReturn = 300;
 	uint256 sellFeeForFund = 10;
 
 	function _tokenTransfer(
@@ -269,6 +277,7 @@ abstract contract AbsToken is IERC20, Ownable {
 		_balances[sender] -= tAmount;
 		uint256 feeAmount;
 		if (takeFee) {
+			// 买卖税收 收到本合约
 			// buy
 			if (_swapPairList[sender]) {
 				uint256 buyFeeAmount = (tAmount * buyFee) / 1000;
@@ -284,6 +293,7 @@ abstract contract AbsToken is IERC20, Ownable {
 				_takeTransfer(sender, fundAddress, FeeForFundAmount);
 			}
 
+			// 钱够了去卖币回流
 			uint256 contract_balance = balanceOf(address(this));
 			bool need_sell = contract_balance >= numTokensSellToFund;
 			if (need_sell && !inSwap && _swapPairList[recipient]) {
@@ -293,9 +303,11 @@ abstract contract AbsToken is IERC20, Ownable {
 		_takeTransfer(sender, recipient, tAmount - feeAmount);
 	}
 
+	// 收了多少税触发卖币回流
 	uint256 public numTokensSellToFund = 10 * 10 ** 18;
 
 	function SwapTokenToFund(uint256 amount) private lockTheSwap {
+		// lp要两种币 先换一半u
 		uint256 half = amount / 2;
 		address[] memory path = new address[](2);
 		path[0] = address(this);
@@ -307,10 +319,11 @@ abstract contract AbsToken is IERC20, Ownable {
 			address(token_distributor),
 			block.timestamp
 		);
-
+		// 取u
 		uint256 swapBalance = USDT.balanceOf(address(token_distributor));
 		USDT.transferFrom(address(token_distributor), address(this), swapBalance);
 
+		// 加池给营销
 		_swapRouter.addLiquidity(
 			address(this),
 			address(USDT),
@@ -333,36 +346,43 @@ abstract contract AbsToken is IERC20, Ownable {
 		payable(msg.sender).transfer(balance);
 	}
 
+	// 设置持有白
 	function setexcludeHolder(address addr, bool enable) external onlyOwner {
 		excludeHolder[addr] = enable;
 	}
 
+	// 批量设置持有白
 	function batchSetexcludeHolder(address[] memory addr, bool enable) external onlyOwner {
 		for (uint i = 0; i < addr.length; i++) {
 			excludeHolder[addr[i]] = enable;
 		}
 	}
 
+	// 设置税白
 	function setFeeWhiteList(address addr, bool enable) external onlyOwner {
 		_feeWhiteList[addr] = enable;
 	}
 
+	// 批量设置税白
 	function batchSetFeeWhiteList(address[] memory addr, bool enable) external onlyOwner {
 		for (uint i = 0; i < addr.length; i++) {
 			_feeWhiteList[addr[i]] = enable;
 		}
 	}
 
+	// 更换营销地址
 	function setFundAddress(address newfund) external onlyOwner {
 		fundAddress = newfund;
 		_feeWhiteList[newfund] = true;
 		excludeHolder[newfund] = true;
 	}
 
+	// 设置持有上限
 	function setHoldLimit(uint256 lim) external onlyOwner {
 		holdLimit = lim;
 	}
 
+	// 设置税点
 	function setFee(
 		uint256 _buyFee,
 		uint256 _sellFeeForReturn,
@@ -371,6 +391,11 @@ abstract contract AbsToken is IERC20, Ownable {
 		buyFee = _buyFee;
 		sellFeeForReturn = _sellFeeForReturn;
 		sellFeeForFund = _sellFeeForFund;
+	}
+
+	// 设置每次卖出token数量
+	function setNumForSell(uint256 _num) external onlyOwner {
+		numTokensSellToFund = _num;
 	}
 
 	receive() external payable {}
@@ -383,10 +408,10 @@ contract CDNs is AbsToken {
 			"CDNs",
 			18,
 			21000000,
-			0x2bf945a83d4DAB2101dB95F1Cb0CA54bfa67aB53,
-			0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D,
-			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995,
-			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995
+			0x2bf945a83d4DAB2101dB95F1Cb0CA54bfa67aB53, //usdt地址
+			0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, //v2路由地址
+			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995, //接收token地址
+			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995 //营销地址
 		)
 	{}
 }
