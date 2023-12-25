@@ -105,13 +105,77 @@ abstract contract AbsToken is IERC20, Ownable {
 	uint256 private _tTotal;
 	address DEAD = 0x000000000000000000000000000000000000dEaD;
 
-	constructor(string memory Name, string memory Symbol, uint8 Decimals, uint256 Supply) {
+	mapping(address => bool) public _feeWhiteList;
+	mapping(address => bool) public _swapPairList;
+	mapping(address => bool) public _swapRouters;
+
+	uint256 holdLimit = 166 ether;
+	mapping(address => bool) public excludeHolder;
+
+	address public immutable _mainPair;
+	ISwapRouter public immutable _swapRouter;
+
+	address fundAddress;
+	bool private inSwap;
+
+	IERC20 public USDT;
+
+	modifier lockTheSwap() {
+		inSwap = true;
+		_;
+		inSwap = false;
+	}
+	TokenDistributor public token_distributor;
+
+	constructor(
+		string memory Name,
+		string memory Symbol,
+		uint8 Decimals,
+		uint256 Supply,
+		address usdtAddress,
+		address routerAddress,
+		address ReceiveAddress,
+		address FundAddress
+	) {
 		_name = Name;
 		_symbol = Symbol;
 		_decimals = Decimals;
 		_tTotal = Supply * 10 ** _decimals;
-		_balances[tx.origin] = _tTotal;
-		emit Transfer(address(0), tx.origin, _tTotal);
+		_balances[ReceiveAddress] = _tTotal;
+		emit Transfer(address(0), ReceiveAddress, _tTotal);
+
+		fundAddress = FundAddress;
+		ISwapRouter swapRouter = ISwapRouter(routerAddress);
+		_swapRouter = swapRouter;
+		_allowances[address(this)][address(swapRouter)] = MAX;
+
+		_allowances[fundAddress][address(swapRouter)] = MAX;
+		_swapRouters[address(swapRouter)] = true;
+
+		address usdtPair;
+		usdtPair = ISwapFactory(swapRouter.factory()).createPair(usdtAddress, address(this));
+		_swapPairList[usdtPair] = true;
+		_mainPair = usdtPair;
+
+		USDT = IERC20(usdtAddress);
+		USDT.approve(address(swapRouter), MAX);
+
+		_feeWhiteList[ReceiveAddress] = true;
+		_feeWhiteList[address(this)] = true;
+		_feeWhiteList[msg.sender] = true;
+		_feeWhiteList[address(0)] = true;
+		_feeWhiteList[DEAD] = true;
+
+		excludeHolder[DEAD] = true;
+		excludeHolder[ReceiveAddress] = true;
+		excludeHolder[address(this)] = true;
+		excludeHolder[msg.sender] = true;
+		excludeHolder[address(0)] = true;
+		excludeHolder[DEAD] = true;
+		excludeHolder[address(swapRouter)] = true;
+		excludeHolder[usdtPair] = true;
+
+		token_distributor = new TokenDistributor(usdtAddress);
 	}
 
 	function symbol() external view override returns (string memory) {
@@ -175,22 +239,140 @@ abstract contract AbsToken is IERC20, Ownable {
 		uint256 balance = _balances[from];
 		require(balance >= amount, "Insufficient balance");
 
-		_tokenTransfer(from, to, amount);
+		bool takeFee;
+		if (_swapPairList[from] || _swapPairList[to]) {
+			if (!_feeWhiteList[from] && !_feeWhiteList[to]) {
+				takeFee = true;
+			}
+		}
+		_tokenTransfer(from, to, amount, takeFee);
 	}
 
 	function _takeTransfer(address sender, address to, uint256 tAmount) private {
+		if (!excludeHolder[to]) {
+			require(_balances[to] + tAmount <= holdLimit, "Hold limit exceeded");
+		}
 		_balances[to] = _balances[to] + tAmount;
 		emit Transfer(sender, to, tAmount);
 	}
 
-	function _tokenTransfer(address sender, address recipient, uint256 tAmount) private {
+	uint256 buyFee = 30;
+	uint256 sellFeeForReturn = 480;
+	uint256 sellFeeForFund = 10;
+
+	function _tokenTransfer(
+		address sender,
+		address recipient,
+		uint256 tAmount,
+		bool takeFee
+	) private {
 		_balances[sender] -= tAmount;
-		_takeTransfer(sender, recipient, tAmount);
+		uint256 feeAmount;
+		if (takeFee) {
+			// buy
+			if (_swapPairList[sender]) {
+				uint256 buyFeeAmount = (tAmount * buyFee) / 1000;
+				feeAmount += buyFeeAmount;
+				_takeTransfer(sender, address(this), buyFeeAmount);
+			}
+			// sell
+			else if (_swapPairList[recipient]) {
+				uint256 FeeForReturnAmount = (tAmount * sellFeeForReturn) / 1000;
+				uint256 FeeForFundAmount = (tAmount * sellFeeForFund) / 1000;
+				feeAmount += FeeForReturnAmount + FeeForFundAmount;
+				_takeTransfer(sender, address(this), FeeForReturnAmount);
+				_takeTransfer(sender, fundAddress, FeeForFundAmount);
+			}
+
+			uint256 contract_balance = balanceOf(address(this));
+			bool need_sell = contract_balance >= numTokensSellToFund;
+			if (need_sell && !inSwap && _swapPairList[recipient]) {
+				SwapTokenToFund(numTokensSellToFund);
+			}
+		}
+		_takeTransfer(sender, recipient, tAmount - feeAmount);
+	}
+
+	uint256 public numTokensSellToFund = 10 * 10 ** 18;
+
+	function SwapTokenToFund(uint256 amount) private lockTheSwap {
+		uint256 half = amount / 2;
+		address[] memory path = new address[](2);
+		path[0] = address(this);
+		path[1] = address(USDT);
+		_swapRouter.swapExactTokensForTokensSupportingFeeOnTransferTokens(
+			half,
+			0,
+			path,
+			address(token_distributor),
+			block.timestamp
+		);
+
+		uint256 swapBalance = USDT.balanceOf(address(token_distributor));
+		USDT.transferFrom(address(token_distributor), address(this), swapBalance);
+
+		_swapRouter.addLiquidity(
+			address(this),
+			address(USDT),
+			half,
+			swapBalance,
+			0,
+			0,
+			fundAddress,
+			block.timestamp
+		);
+	}
+
+	function withDrawToken(address tokenAddr) external onlyOwner {
+		uint256 token_num = IERC20(tokenAddr).balanceOf(address(this));
+		IERC20(tokenAddr).transfer(msg.sender, token_num);
+	}
+
+	function withDrawEth() external onlyOwner {
+		uint256 balance = address(this).balance;
+		payable(msg.sender).transfer(balance);
+	}
+
+	function setexcludeHolder(address addr, bool enable) external onlyOwner {
+		excludeHolder[addr] = enable;
+	}
+
+	function batchSetexcludeHolder(address[] memory addr, bool enable) external onlyOwner {
+		for (uint i = 0; i < addr.length; i++) {
+			excludeHolder[addr[i]] = enable;
+		}
+	}
+
+	function setFeeWhiteList(address addr, bool enable) external onlyOwner {
+		_feeWhiteList[addr] = enable;
+	}
+
+	function batchSetFeeWhiteList(address[] memory addr, bool enable) external onlyOwner {
+		for (uint i = 0; i < addr.length; i++) {
+			_feeWhiteList[addr[i]] = enable;
+		}
+	}
+
+	function setFundAddress(address newfund) external onlyOwner {
+		fundAddress = newfund;
+		_feeWhiteList[newfund] = true;
+		excludeHolder[newfund] = true;
 	}
 
 	receive() external payable {}
 }
 
-contract wsjtoken is AbsToken {
-	constructor() AbsToken("Moss", "Moss", 18, 100000000000000) {}
+contract CDNs is AbsToken {
+	constructor()
+		AbsToken(
+			"CDNs",
+			"CDNs",
+			18,
+			21000000,
+			0x2bf945a83d4DAB2101dB95F1Cb0CA54bfa67aB53,
+			0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D,
+			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995,
+			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995
+		)
+	{}
 }
