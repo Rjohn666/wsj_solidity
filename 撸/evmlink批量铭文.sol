@@ -7,6 +7,7 @@ contract BulkBRC20Mint {
     address owner;
     uint256 tax = 5;
 
+
     constructor() {
         owner = msg.sender;
     }
