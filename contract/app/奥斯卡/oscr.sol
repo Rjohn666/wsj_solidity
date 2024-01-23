@@ -67,27 +67,42 @@ contract SellBot is Ownable {
     uint256 public totalSupply = 21000;
     uint256 public totalBoughtNum;
 
-    uint256 public sellPrice = 1000 ether;
+    uint256 public SellPrice = 1 ether;	
+	uint256 public WhitelistSellPrice = 800 ether;	
     uint256 public limitPerWallet = 30;
     
     mapping(address => uint256) boughtNum;
     mapping(address => uint256) PayedNum;
 
-    bool public STATUS;
+    uint public STATUS=1;
+    uint256 public OpenTime=1673280000;
 
-    uint256 public btcOpenTime;
-    uint256 public QckOpenTime;
+
+	mapping(address => bool) public whitelist;
+
 
     function buy(uint256 _num) public {
-        require(STATUS,"not open");
-        require(_num > 0,"num must be greater than 0");
-        require(totalBoughtNum + _num <= totalSupply,"Inadequate supply");
+        require(STATUS==2,"not open");
+		uint256 _price;
+		_price = SellPrice * _num;
+		exOrder(msg.sender, _price, _num);
+        
+    }
 
-        address buyer = msg.sender;
+	function whiteListBuy(uint256 _num) public {
+        require(STATUS==1,"not open");
+		uint256 _price;
+		_price = WhitelistSellPrice * _num;
+		exOrder(msg.sender, _price, _num);
+        
+    }
+
+	function exOrder(address buyer,uint256 _price,uint256 _num) private {
+		require(_num > 0,"num must be greater than 0");
+        require(totalBoughtNum + _num <= totalSupply,"Inadequate supply");
         require(boughtNum[buyer] + _num <= limitPerWallet,"Exceed the limit");
 
-        uint256 _price = sellPrice * _num;
-        uint256 balanceBefore = TOKEN.balanceOf(address(this));
+		uint256 balanceBefore = TOKEN.balanceOf(address(this));
         TOKEN.transferFrom(buyer, address(this), _price);
         require(TOKEN.balanceOf(address(this)) - balanceBefore >= _price,"Error payment amount");
 
@@ -96,17 +111,21 @@ contract SellBot is Ownable {
         totalBoughtNum += _num;
 
         PayedNum[buyer] += _price;
-    }
+	}
 
 
     function getAddressStatus(address addr) view public returns(uint256 _bought,uint256 _payed) {
         _bought = boughtNum[addr];
-        _payed = boughtNum[addr];
+        _payed = PayedNum[addr];
     }
     
 
     address[] public buyers;
 	mapping(address => uint256) public buyerIndex;
+
+	function getBuyersLength() public view returns (uint256 len){
+		len = buyers.length;
+	}
 
 	function addHolder(address adr) private {
 		if (0 == buyerIndex[adr]) {
@@ -124,26 +143,20 @@ contract SellBot is Ownable {
 		}
 	}
 
-    function setTime(uint256 _btc,uint256 _qkc) onlyOwner public {
-        btcOpenTime = _btc;
-        QckOpenTime = _qkc;
+    function setTime(uint256 _ts) onlyOwner public {
+        OpenTime = _ts;
     }
 
-    function setStatus() onlyOwner public {
-        if (STATUS){
-            STATUS = false;
-        }else{
-            STATUS = true;
-        }
+    function setStatus(uint _status) onlyOwner public {
+		STATUS = _status;
     }
 
-    function setPrice(uint256 _price) onlyOwner public {
-        sellPrice = _price;
+    function setQkcPrice(uint256 _price) onlyOwner public {
+        SellPrice = _price;
     }
 
     function setLimit(uint256 _lim) onlyOwner public {
         limitPerWallet = _lim;
     }
-
 
     }
