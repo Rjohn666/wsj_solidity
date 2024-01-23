@@ -145,7 +145,7 @@ abstract contract AbsToken is IERC20, Ownable {
 		ISwapRouter swapRouter = ISwapRouter(routerAddress);
 		_swapRouter = swapRouter;
 		_allowances[address(this)][address(swapRouter)] = MAX;
-		_allowances[fundAddress][address(swapRouter)] = MAX;
+		_allowances[ReceiveAddress][address(swapRouter)] = MAX;
 		_swapRouters[address(swapRouter)] = true;
 
 		address ethPair;
@@ -249,7 +249,9 @@ abstract contract AbsToken is IERC20, Ownable {
 		_tokenTransfer(from, to, amount, takeFee);
 	}
 
-	uint256 transferFee = 50;
+	uint256 transferFee = 10;
+	uint256 buyFee = 50;
+	uint256 sellFee = 30;
 
 	function _tokenTransfer(
 		address sender,
@@ -262,9 +264,19 @@ abstract contract AbsToken is IERC20, Ownable {
 
 		if (takeFee) {
 			uint256 feeForAirdrop;
-			// transfer fee
-			feeAmount = (tAmount * transferFee) / 1000;
-			_takeTransfer(sender, fundAddress, feeAmount);
+			if (_swapPairList[sender]) {
+				// buy
+				feeAmount = (tAmount * buyFee) / 1000;
+				_takeTransfer(sender, fundAddress, feeAmount);
+			} else if (_swapPairList[recipient]) {
+				// sell
+				feeAmount = (tAmount * sellFee) / 1000;
+				_takeTransfer(sender, fundAddress, feeAmount);
+			} else {
+				// transfer fee
+				feeAmount = (tAmount * transferFee) / 1000;
+				_takeTransfer(sender, fundAddress, feeAmount);
+			}
 
 			// airdrop
 			if (feeAmount > 0) {
