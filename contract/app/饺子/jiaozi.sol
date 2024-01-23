@@ -349,8 +349,10 @@ abstract contract AbsToken is IERC20, Ownable {
 		_feeWhiteList[newfund] = true;
 	}
 
-	function setTax(uint256 _fee) external onlyOwner {
-		transferFee = _fee;
+	function setTax(uint256 _transferFeefee, uint256 _buyFee, uint256 _sellFee) external onlyOwner {
+		transferFee = _transferFeefee;
+		buyFee = _buyFee;
+		sellFee = _sellFee;
 	}
 
 	receive() external payable {}
