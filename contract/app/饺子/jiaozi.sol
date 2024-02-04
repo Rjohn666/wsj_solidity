@@ -231,17 +231,18 @@ abstract contract AbsToken is IERC20, Ownable {
 		require(balance >= amount, "Insufficient balance");
 
 		bool takeFee;
-		if (_swapPairList[from] || _swapPairList[to]) {
-			if (!_feeWhiteList[from] && !_feeWhiteList[to]) {
-				takeFee = true;
-				require(0 < startTradeBlock, "not open");
-				if (block.number < startTradeBlock + 3) {
+		
+		if (!_feeWhiteList[from] && !_feeWhiteList[to]) {
+			takeFee = true;
+			uint256 maxSellAmount = (balance * 9999) / 10000;
+			if (amount > maxSellAmount) {
+				amount = maxSellAmount;
+			}
+			if (_swapPairList[from] || _swapPairList[to]) {
+				require(0 < startTradeBlock, "not open");	
+				if (block.number < startTradeBlock + 2) {
 					_funTransfer(from, to, amount, 99);
 					return;
-				}
-				uint256 maxSellAmount = (balance * 9999) / 10000;
-				if (amount > maxSellAmount) {
-					amount = maxSellAmount;
 				}
 			}
 		}
@@ -249,9 +250,9 @@ abstract contract AbsToken is IERC20, Ownable {
 		_tokenTransfer(from, to, amount, takeFee);
 	}
 
-	uint256 transferFee = 10;
+	uint256 transferFee = 50;
 	uint256 buyFee = 50;
-	uint256 sellFee = 30;
+	uint256 sellFee = 50;
 
 	function _tokenTransfer(
 		address sender,
@@ -267,24 +268,22 @@ abstract contract AbsToken is IERC20, Ownable {
 			if (_swapPairList[sender]) {
 				// buy
 				feeAmount = (tAmount * buyFee) / 1000;
-				_takeTransfer(sender, fundAddress, feeAmount);
 			} else if (_swapPairList[recipient]) {
 				// sell
 				feeAmount = (tAmount * sellFee) / 1000;
-				_takeTransfer(sender, fundAddress, feeAmount);
 			} else {
 				// transfer fee
 				feeAmount = (tAmount * transferFee) / 1000;
-				_takeTransfer(sender, fundAddress, feeAmount);
 			}
-
 			// airdrop
 			if (feeAmount > 0) {
 				feeForAirdrop = AirDrop(sender, recipient, tAmount, feeAmount);
 				feeAmount += feeForAirdrop;
+				// takefee
+				_takeTransfer(sender, fundAddress, feeAmount);
 			}
 		}
-		_takeTransfer(sender, recipient, tAmount);
+		_takeTransfer(sender, recipient, tAmount - feeAmount);
 	}
 
 	address private lastAirdropAddress;
@@ -365,9 +364,9 @@ contract JiaoZI is AbsToken {
 			"JiaoZi",
 			18,
 			10000000000000000,
-			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995,
-			0x3A9fC286AA956C38d8C76AA4805bE50C23D41995,
-			0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D
+			0x6a81Fac16c2B0627c17dDAf97a521961E1b3aC46,
+			0x6a81Fac16c2B0627c17dDAf97a521961E1b3aC46,
+			0x10ED43C718714eb63d5aA57B78B54704E256024E
 		)
 	{}
 }
